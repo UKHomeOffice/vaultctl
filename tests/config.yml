@@ -1,0 +1,75 @@
+
+
+users:
+- userpass:
+    username: rohithj
+    password: password1
+  policies:
+    - common
+    - platform_tls
+- userpass:
+    username: alex
+    password: password1
+  policies:
+    - root
+- userpass:
+    username: rohith
+    password: password1
+  policies:
+    - common
+    - platform_tls
+
+backends:
+- type: transit
+  path: platform/encode
+  description: A transit backend used to encrypt configuration files
+  config:
+  - uri: keys/default
+    oneshot: true
+- type: generic
+  path: platform/secrets
+  description: platform secrets
+- path: platform/platform_tls
+  description: platform tls
+  type: generic
+- path: platform/pki
+  type: pki
+  description: Platform PKI backend
+  config:
+  - uri: root/generate/internal
+    common_name: example.com
+    ttl: 3h
+    oneshot: true
+  - uri: roles/example-dot-com
+    allowed_domains: example.com
+    allow_subdomains: true
+    max_ttl: 1h
+- path: platform/aws
+  type: aws
+  description: Platform AWS backend
+  config:
+  - uri: config/root
+    access_key: AKIAJWVN5Z4FOFT7NLNA
+    secret_key: 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
+    region: us-east-1
+- path: mattermost/secrets
+  description: Mattermost Secrets
+  type: generic
+
+secrets:
+  - path: platform/secrets/platform_tls
+    values:
+      hello: world
+      rohith: yes
+  - path: platform/secrets/se1
+    values:
+      hello: world
+      rohith: yes
+  - path: platform/secrets/se2
+    values:
+      hello: world
+      rohith: yes
+  - path: platform/secrets/se3
+    values:
+      hello: world
+      rohith: yes
