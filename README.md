@@ -122,3 +122,4 @@ secrets:
 ---
 
 - Need to finish off the Kubernetes intregetion to place the vault credentials in k8s secrets.
+- Add the option of encryption to the files 

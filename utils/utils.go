@@ -73,5 +73,10 @@ func IsDirectory(path string) bool {
 
 // IsFile checks if the path is a file
 func IsFile(path string) bool {
-	return !IsDirectory(path)
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+
+	return !stat.IsDir()
 }
