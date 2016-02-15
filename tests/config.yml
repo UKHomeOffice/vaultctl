@@ -45,15 +45,15 @@ backends:
     max_ttl: 1h
 # one of the annoying things about the mysql backend is it attempts to connect to the db when
 # adding the config/connection config??
-- path: platform/db
-  type: mysql
-  description: Platform Database
-  config:
-  - uri: config/connection
-    value: root:root@tcp(127.0.0.1:3306)/
-    oneshot: true
-  - uri: roles/readonly
-    sql: CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';GRANT SELECT ON *.* TO '{{name}}'@'%'
+#- path: platform/db
+#  type: mysql
+#  description: Platform Database
+#  config:
+#  - uri: config/connection
+#    value: root:root@tcp(127.0.0.1:3306)/
+#    oneshot: true
+#  - uri: roles/readonly
+#    sql: CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';GRANT SELECT ON *.* TO '{{name}}'@'%'
 - path: platform/aws
   type: aws
   description: Platform AWS backend
