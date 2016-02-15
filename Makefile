@@ -1,10 +1,10 @@
 
-NAME=vault-config
+NAME=vaultctl
 AUTHOR=ukhomeofficedigital
 REGISTRY=quay.io
 HARDWARE=$(shell uname -m)
 GODEPS=godep
-VERSION=$(shell awk '/version/ { print $$3 }' doc.go | sed 's/"//g')
+VERSION=$(shell awk '/Version =/ { print $$3 }' doc.go | sed 's/"//g')
 DEPS=$(shell go list -f '{{range .TestImports}}{{.}} {{end}}' ./...)
 PACKAGES=$(shell go list ./...)
 VETARGS?=-asmdecl -atomic -bool -buildtags -copylocks -methods -nilfunc -printf -rangeloops -shift -structtags -unsafeptr
@@ -22,6 +22,11 @@ static:
 	@echo "--> Compiling the static binary"
 	mkdir -p bin
 	CGO_ENABLED=0 GOOS=linux ${GODEPS} go build -a -tags netgo -ldflags '-w' -o bin/${NAME}
+
+docker-build:
+	@echo "--> Compiling the project"
+	sudo docker run --rm -v ${ROOT_DIR}:/go/src/github.com/gambol99/${NAME} \
+		-w /go/src/github.com/gambol99/${NAME} -e GOOS=linux golang:${GOVERSION} make static
 
 docker: static
 	@echo "--> Building the docker image"

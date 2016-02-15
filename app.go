@@ -23,6 +23,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/gambol99/vaultctl/utils"
 )
 
 func newVaultConfig() *cli.App {
@@ -53,6 +54,20 @@ func executeCommand(cx *cli.Context, action func(*cli.Context, *factory) error) 
 	}
 
 	f := &factory{}
+
+	// step: validate we have the requirements
+	if creds == "" {
+		if username == "" {
+			printUsage("you have not specified the vault username")
+		}
+		if password == "" {
+			printUsage("you have not specified the vault password")
+		}
+	} else {
+		if !utils.IsFile(creds) {
+			printUsage("the vault credentials file does not exist")
+		}
+	}
 
 	// step: create a vault client
 	client, err := vault.New(host, username, password, creds)
@@ -89,7 +104,7 @@ func getGlobalOptions() []cli.Flag {
 		},
 
 		cli.StringFlag{
-			Name:   "t, vault-password",
+			Name:   "p, vault-password",
 			Usage:  "the vault password to use to authenticate to vault service",
 			EnvVar: "VAULT_PASSWORD",
 		},
