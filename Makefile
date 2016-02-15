@@ -3,6 +3,7 @@ NAME=vault-config
 AUTHOR=ukhomeofficedigital
 REGISTRY=quay.io
 HARDWARE=$(shell uname -m)
+GODEPS=godep
 VERSION=$(shell awk '/version/ { print $$3 }' doc.go | sed 's/"//g')
 DEPS=$(shell go list -f '{{range .TestImports}}{{.}} {{end}}' ./...)
 PACKAGES=$(shell go list ./...)
@@ -15,12 +16,12 @@ default: build
 build:
 	@echo "--> Compiling the project"
 	mkdir -p bin
-	go build -o bin/${NAME}
+	${GODEPS} go build -o bin/${NAME}
 
 static:
 	@echo "--> Compiling the static binary"
 	mkdir -p bin
-	CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' -o bin/${NAME}
+	CGO_ENABLED=0 GOOS=linux ${GODEPS} go build -a -tags netgo -ldflags '-w' -o bin/${NAME}
 
 docker: static
 	@echo "--> Building the docker image"

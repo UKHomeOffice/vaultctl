@@ -49,8 +49,8 @@ backends:
   description: Platform AWS backend
   config:
   - uri: config/root
-    access_key: AKIAJWVN5Z4FOFT7NLNA
-    secret_key: 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
+    access_key: TEST
+    secret_key: TEST
     region: us-east-1
 - path: mattermost/secrets
   description: Mattermost Secrets

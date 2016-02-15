@@ -1,0 +1,50 @@
+{
+	"ImportPath": "github.com/gambol99/vaultctl",
+	"GoVersion": "go1.5.3",
+	"Deps": [
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.8.7-55-gf7f79f7",
+			"Rev": "f7f79f729e0fbe2fcc061db48a9ba0263f588252"
+		},
+		{
+			"ImportPath": "github.com/codegangsta/cli",
+			"Comment": "1.2.0-187-gc31a797",
+			"Rev": "c31a7975863e7810c92e2e288a9ab074f9a88f29"
+		},
+		{
+			"ImportPath": "github.com/fatih/color",
+			"Comment": "v0.1-12-g9aae6aa",
+			"Rev": "9aae6aaa22315390f03959adca2c4d395b02fcef"
+		},
+		{
+			"ImportPath": "github.com/fatih/structs",
+			"Rev": "d98fb2baf2451b68f200cbe973d922c06cb7cca2"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl",
+			"Rev": "578dd9746824a54637686b51a41bad457a56bcef"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/vault/api",
+			"Comment": "v0.3.1",
+			"Rev": "2b1ddc4a7b7b9754dd55f61494de460fc07239a5"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-colorable",
+			"Rev": "3dac7b4f76f6e17fb39b768b89e3783d16e237fe"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-isatty",
+			"Rev": "56b76bdf51f7708750eac80fa38b952bb9f32639"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/mapstructure",
+			"Rev": "281073eb9eb092240d33ef253c404f1cca550309"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "49c95bdc21843256fb6c4e0d370a05f24a0bf213"
+		}
+	]
+}
