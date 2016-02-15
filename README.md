@@ -1,7 +1,7 @@
 ### **Vaultctl**
 
 ---
-Vaultctl is a command line utilty for provisioning a Hashicorp [vault](https://www.vaultproject.io) from configuration files. Essentially it was written so we could source control our users, policies, backends and secrets, synchronize the vault against them and rebuild on-demand if required.
+Vaultctl is a command line utilty for provisioning a Hashicorp's [Vault](https://www.vaultproject.io) from configuration files. Essentially it was written so we could source control our users, policies, backends and secrets, synchronize the vault against them and rebuild on-demand if required.
  
 ##### **Build**
 ---
