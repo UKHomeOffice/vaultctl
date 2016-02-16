@@ -69,11 +69,14 @@ func getGlobalOptions() []cli.Flag {
 			Usage:  "the vault username to use to authenticate to vault service",
 			EnvVar: "VAULT_USERNAME",
 		},
-
 		cli.StringFlag{
 			Name:   "p, vault-password",
 			Usage:  "the vault password to use to authenticate to vault service",
 			EnvVar: "VAULT_PASSWORD",
+		},
+		cli.StringFlag{
+			Name:   "t, vault-token",
+			Usage: 	"a vault token used to authenticate to vault service",
 		},
 		cli.StringFlag{
 			Name:   "c, credentials",

@@ -33,23 +33,9 @@ const (
 	apiVersion = "v1"
 )
 
-func New(hostname, username, password, filename string) (*Client, error) {
+func New(hostname, username, password, filename, token string) (*Client, error) {
 	log.Debugf("create vault client to host: %s", hostname)
-	// step: create the credentials
-	creds := &api.UserCredentials{
-		Username: username,
-		Password: password,
-	}
-	// step: do we have a credentials file?
-	if filename != "" {
-		creds = new(api.UserCredentials)
-		if err := utils.DecodeFile(filename, creds); err != nil {
-			return nil, err
-		}
-		if err := creds.IsValid(); err != nil {
-			return nil, err
-		}
-	}
+
 	// step: get the client configuration
 	config := v.DefaultConfig()
 	config.Address = hostname
@@ -72,11 +58,32 @@ func New(hostname, username, password, filename string) (*Client, error) {
 	}
 
 	// step: attempt to login
-	token, err := service.userLogin(creds)
-	if err != nil {
-		return nil, err
+	if filename != "" {
+		creds := new(api.UserCredentials)
+		if err := utils.DecodeFile(filename, creds); err != nil {
+			return nil, err
+		}
+		if err := creds.IsValid(); err != nil {
+			return nil, err
+		}
+
+		token, err := service.userLogin(creds)
+		if err != nil {
+			return nil, err
+		}
+		client.SetToken(token)
+	} else if username != "" && password != "" {
+		token, err := service.userLogin(&api.UserCredentials{
+			Username: username,
+			Password: password,
+		})
+		if err != nil {
+			return nil, err
+		}
+		client.SetToken(token)
+	} else {
+		client.SetToken(token)
 	}
-	client.SetToken(token)
 
 	return &Client{
 		client: client,
