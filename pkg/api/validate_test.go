@@ -122,16 +122,16 @@ func TestBackendIsValid(t *testing.T) {
 		{
 			Backend: &Backend{
 				Path: "/", Description: "test", Type: "mysql",
-				Config: []*BackendConfig{
-					&BackendConfig{},
+				Attrs: []*Attributes{
+					&Attributes{},
 				},
 			},
 		},
 		{
 			Backend: &Backend{
 				Path: "/", Description: "test", Type: "mysql",
-				Config: []*BackendConfig{
-					&BackendConfig{"uri": "test"},
+				Attrs: []*Attributes{
+					&Attributes{"uri": "test"},
 				},
 			},
 			Ok: true,

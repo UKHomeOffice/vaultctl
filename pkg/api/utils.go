@@ -49,21 +49,28 @@ func (r Backend) GetMaxTTL() string {
 }
 
 // URI returns the uri for the config item
-func (r *BackendConfig) URI() string {
+func (r *Attributes) URI() string {
 	x, _ := (*r)["uri"]
 	return x
 }
 
-func (r *BackendConfig) Map() map[string]string {
+// IsOneshot checks if the attribute is a oneshot attribute
+func (r *Attributes) IsOneshot() bool {
+	_, found := (*r)["oneshot"]
+	return found
+}
+
+// Values retrieves the values from the attributes
+func (r *Attributes) Values() map[string]string {
 	return (*r)
 }
 
 // GetPath returns the uri of the config
-func (r *BackendConfig) GetPath(ns string) string {
+func (r *Attributes) GetPath(ns string) string {
 	return fmt.Sprintf("%s/%s", ns, r.URI())
 }
 
-func (r *BackendConfig) String() string {
+func (r *Attributes) String() string {
 	var items []string
 	for k, v := range *r {
 		items = append(items, fmt.Sprintf("[%s|%s]", k, v))

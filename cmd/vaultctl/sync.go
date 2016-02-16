@@ -33,6 +33,8 @@ import (
 )
 
 type syncCommand struct {
+	// a collection of auths
+	auths []*api.Auth
 	// a collection of users
 	users []*api.User
 	// a collection of backends
@@ -47,6 +49,8 @@ type syncCommand struct {
 	transit string
 	// the vault client
 	client *vault.Client
+	// whether to skip applying the auths to vault
+	skipAuths bool
 	// whether to skip applying the users to vault
 	skipUsers bool
 	// whether to skip applying the backend's to vault
@@ -64,7 +68,7 @@ func newSyncCommand() cli.Command {
 	return new(syncCommand).getCommand()
 }
 
-func (r syncCommand) action(cx *cli.Context) error {
+func (r *syncCommand) action(cx *cli.Context) error {
 	startTime := time.Now()
 	// step: valid the command line options
 	if err := r.validateAction(cx); err != nil {
@@ -80,6 +84,23 @@ func (r syncCommand) action(cx *cli.Context) error {
 	// step: parse the configuration files
 	if err := r.parseConfigFiles(); err != nil {
 		return err
+	}
+	// step: synchronize the elements
+	if err := r.synchronize(); err != nil {
+		return err
+	}
+
+	log.Infof("synchronization complete, time took: %s", time.Now().Sub(startTime).String())
+
+	return nil
+}
+
+// synchronize process the items and sync them
+func (r *syncCommand) synchronize() error {
+	if !r.skipAuths {
+		if err := r.applyAuths(r.auths); err != nil {
+			return err
+		}
 	}
 	if !r.skipPolicies {
 		if err := r.applyPolicies(r.policyFiles); err != nil {
@@ -101,16 +122,78 @@ func (r syncCommand) action(cx *cli.Context) error {
 			return err
 		}
 	}
-	log.Infof("synchronization complete, time took: %s", time.Now().Sub(startTime).String())
+
+	return nil
+}
+
+// applyAuths applies the auth backends
+func (r *syncCommand) applyAuths(auths []*api.Auth) error {
+	log.Infof("%s", color.GreenString("-> synchronizing the auth backends, %d backends", len(auths)))
+	for _, x := range auths {
+		// step: check the backend is valid
+		if err := x.IsValid(); err != nil {
+			if !r.skipErrors {
+				return err
+			}
+			log.Warnf("invalid auth config, error: %s", err)
+			continue
+		}
+
+		// step: check the backend is mounted
+		mounted, err := r.client.Client().Sys().ListAuth()
+		if err != nil {
+			return err
+		}
+
+		// step: if not mounted? attempt to mount
+		if _, found := mounted[x.Type+"/"]; !found {
+			log.Infof("[auth: %s] type: %s is not mounted, attempting to mount now", x.Path, x.Type)
+			if err := r.client.Client().Sys().EnableAuth(x.Path, x.Type, x.Description); err != nil {
+				if !r.skipErrors {
+					return err
+				}
+				log.Warnf("unable to enable the authentication backand: %s, error: %s", x.Path, err)
+				continue
+			}
+		} else {
+			log.Infof("[auth: %s] already create, skipping to configuration", x.Path)
+		}
+
+		// step: config the backend
+		for _, c := range x.Attrs {
+			// step: get the full path
+			uri := fmt.Sprintf("/auth/%s", c.GetPath(x.Path))
+			// step: check its valid
+			if err := c.IsValid(); err != nil {
+				return fmt.Errorf("the attribute for auth backend: %s invalid, error: %s", x.Path, err)
+			}
+			log.Infof("[auth->config: %s] applying configuration to auth", uri)
+
+			resp, err := r.client.Request("PUT", uri, &c)
+			if err != nil {
+				if !r.skipErrors {
+					return err
+				}
+				log.Warningf("unable to mount auth backend: %s, error: %s", x.Path, err)
+				continue
+			}
+			if resp.StatusCode != http.StatusNoContent {
+				if !r.skipErrors {
+					return err
+				}
+				log.Warningf("unable to apply to auth backend: %s, config: %s, error: %s", x.Path, c.URI(), resp.Body)
+			}
+		}
+	}
 
 	return nil
 }
 
 // applyPolicies applies the policies to a vault instance
-func (r syncCommand) applyPolicies(policies []string) error {
-	log.Infof("%s", color.GreenString("-> synchronizing the vault policies, %d files", len(r.policyFiles)))
+func (r *syncCommand) applyPolicies(policies []string) error {
+	log.Infof("%s", color.GreenString("-> synchronizing the vault policies, %d files", len(policies)))
 
-	for _, p := range r.policyFiles {
+	for _, p := range policies {
 		name := filepath.Base(p)
 		// step: read in the content
 		content, err := ioutil.ReadFile(p)
@@ -136,7 +219,7 @@ func (r syncCommand) applyPolicies(policies []string) error {
 }
 
 // applyUsers synchronizes the users with vault
-func (r syncCommand) applyUsers(users []*api.User) error {
+func (r *syncCommand) applyUsers(users []*api.User) error {
 	log.Infof("%s", color.GreenString("-> synchronizing the vault users, users: %d", len(users)))
 
 	for _, x := range users {
@@ -147,7 +230,12 @@ func (r syncCommand) applyUsers(users []*api.User) error {
 		} else if err != nil {
 			return err
 		}
-		log.Infof("[user: %s] ensuring user, policies: %s", x.UserPass.Username, x.GetPolicies())
+		path := x.Path
+		if path == "" {
+			path = "default"
+		}
+
+		log.Infof("[user: %s] path: %s, ensuring user, policies: %s",  x.UserPass.Username, path, x.GetPolicies())
 
 		// step: attempt to add the user
 		if err := r.client.AddUser(x); err != nil {
@@ -162,7 +250,7 @@ func (r syncCommand) applyUsers(users []*api.User) error {
 }
 
 // syncBackends synchronizes the backend's with vault
-func (r syncCommand) applyBackends(backends []*api.Backend) error {
+func (r *syncCommand) applyBackends(backends []*api.Backend) error {
 	log.Infof("%s", color.GreenString("-> synchronizing the backends, backend: %d", len(backends)))
 
 	for _, backend := range backends {
@@ -205,13 +293,12 @@ func (r syncCommand) applyBackends(backends []*api.Backend) error {
 		}
 
 		// step: apply the configuration
-		for _, c := range backend.Config {
+		for _, c := range backend.Attrs {
 			// step: get the path
 			uri := c.GetPath(path)
 
 			// step: check if a once type setting?
-			_, oneshot := c.Map()["oneshot"]
-			if found && oneshot {
+			if found && c.IsOneshot() {
 				log.Infof("[backend:%s] skipping the config, as it's a oneshot setting", uri)
 				continue
 			}
@@ -281,6 +368,7 @@ func (r *syncCommand) parseConfigFiles() error {
 		r.users = append(r.users, cfg.Users...)
 		r.backends = append(r.backends, cfg.Backends...)
 		r.secrets = append(r.secrets, cfg.Secrets...)
+		r.auths = append(r.auths, cfg.Auths...)
 	}
 
 	return nil
@@ -327,7 +415,7 @@ func (r *syncCommand) validateAction(cx *cli.Context) error {
 }
 
 // getCommand returns the command set
-func (r syncCommand) getCommand() cli.Command {
+func (r *syncCommand) getCommand() cli.Command {
 	return cli.Command{
 		Name:    "synchronize",
 		Aliases: []string{"sync"},

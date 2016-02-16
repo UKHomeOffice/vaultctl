@@ -13,13 +13,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
-
-const (
-	// Author is the author of the program
-	Author = "Rohith"
-	// Email is the email of the author
-	Email = "gambol99@gmail.com"
-	// Version is the version
-	Version = "v0.0.3"
-)
+package vault

@@ -16,6 +16,8 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
+
 	"github.com/gambol99/vaultctl/pkg/utils"
 	"github.com/gambol99/vaultctl/pkg/vault"
 
@@ -27,24 +29,22 @@ func getVaultClient(cx *cli.Context) (*vault.Client, error) {
 	host := cx.GlobalString("vault-addr")
 	username := cx.GlobalString("vault-username")
 	password := cx.GlobalString("vault-password")
+	token := cx.GlobalString("vault-token")
 	creds := cx.GlobalString("credentials")
 
 	// step: validate we have the requirements
-	if creds == "" {
-		if username == "" {
-			printUsage("you have not specified the vault username")
-		}
-		if password == "" {
-			printUsage("you have not specified the vault password")
-		}
-	} else {
+	if creds != "" {
 		if !utils.IsFile(creds) {
 			printUsage("the vault credentials file does not exist")
+		}
+	} else if token == "" {
+		if username == "" || password == "" {
+			return nil, fmt.Errorf("you need to specify a username and password if no token")
 		}
 	}
 
 	// step: create a vault client
-	client, err := vault.New(host, username, password, creds)
+	client, err := vault.New(host, username, password, creds, token)
 	if err != nil {
 		return nil, err
 	}

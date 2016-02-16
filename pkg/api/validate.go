@@ -29,18 +29,50 @@ var (
 		"cassandra", "consul", "cubbyhole", "mysql",
 		"postgres", "ssh", "custom",
 	}
+
+	supportAuthTypes = []string{
+		"userpass", "ldap", "token", "appid", "github", "mfa", "tls",
+	}
 )
 
-// IsValid validates the user is ok
-func (r User) IsValid() error {
-	if r.UserPass == nil {
-		return fmt.Errorf("does not have userpass credentials")
-	}
-	if err := r.UserPass.IsValid(); err != nil {
-		return err
+// IsValid validates the attributes
+func (r Attributes) IsValid() error {
+	if r.URI() == "" {
+		return fmt.Errorf("attributes must have a uri specified")
 	}
 
 	return nil
+}
+
+// IsValid validates the auth backend
+func (r Auth) IsValid() error {
+	if r.Type == "" {
+		return fmt.Errorf("you must specify a auth type")
+	}
+	if r.Path == "" {
+		return fmt.Errorf("you must specify a path")
+	}
+
+	if !utils.ContainedIn(r.Type, supportAuthTypes) {
+		return fmt.Errorf("auth type: %s is a unsupported auth type", r.Type)
+	}
+
+	for i, x := range r.Attrs {
+		if err := x.IsValid(); err != nil {
+			return fmt.Errorf("attribute %s invalid, error: %s", i, err)
+		}
+	}
+
+	return nil
+}
+
+// IsValid validates the user is ok
+func (r *User) IsValid() error {
+	if r.UserPass != nil {
+		return r.UserPass.IsValid()
+	}
+
+	return fmt.Errorf("you have not added authentication to the user")
 }
 
 // IsValid validates the user credential is ok
@@ -90,14 +122,14 @@ func (r Backend) IsValid() error {
 	if !utils.ContainedIn(r.Type, supportedBackendTypes) {
 		return fmt.Errorf("backend: %s, unsupported type: %s, supported types are: %s", r.Path, r.Type, supportedBackends())
 	}
-	if r.Config != nil && len(r.Config) > 0 {
-		for _, x := range r.Config {
+	if r.Attrs != nil && len(r.Attrs) > 0 {
+		for _, x := range r.Attrs {
 			// step: ensure the config has a uri
 			if x.URI() == "" {
 				return fmt.Errorf("backend: %s, config for must have uri", r.Path)
 			}
 			// step: read in a any files reference by @path
-			for k, v := range x.Map() {
+			for k, v := range x.Values() {
 				if strings.HasPrefix(v, "@") {
 					path := strings.TrimPrefix(v, "@")
 					if !utils.IsFile(path) {

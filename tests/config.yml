@@ -1,4 +1,15 @@
 
+auths:
+- path: userpass
+  type: userpass
+- path: extra/userpass
+  type: userpass
+- path: github
+  type: github
+  attributes:
+  - uri: config
+    organization: UKHomeOffice
+
 users:
 - userpass:
     username: rohithj
@@ -22,7 +33,7 @@ backends:
 - type: transit
   path: platform/encode
   description: A transit backend used to encrypt configuration files
-  config:
+  attributes:
   - uri: keys/default
     oneshot: true
 - type: generic
@@ -34,7 +45,7 @@ backends:
 - path: platform/pki
   type: pki
   description: Platform PKI backend
-  config:
+  attributes:
   - uri: root/generate/internal
     common_name: example.com
     ttl: 3h
@@ -57,7 +68,7 @@ backends:
 - path: platform/aws
   type: aws
   description: Platform AWS backend
-  config:
+  attributes:
   - uri: config/root
     access_key: TEST
     secret_key: TEST
