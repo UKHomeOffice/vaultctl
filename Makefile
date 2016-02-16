@@ -1,10 +1,10 @@
 
 NAME=vaultctl
-AUTHOR=ukhomeofficedigital
-REGISTRY=quay.io
+AUTHOR=gambol99
+REGISTRY=docker.io
 HARDWARE=$(shell uname -m)
 GODEPS=godep
-VERSION=$(shell awk '/Version =/ { print $$3 }' doc.go | sed 's/"//g')
+VERSION=$(shell awk '/Version =/ { print $$3 }' cmd/*/doc.go | sed 's/"//g')
 DEPS=$(shell go list -f '{{range .TestImports}}{{.}} {{end}}' ./...)
 PACKAGES=$(shell go list ./...)
 VETARGS?=-asmdecl -atomic -bool -buildtags -copylocks -methods -nilfunc -printf -rangeloops -shift -structtags -unsafeptr
@@ -16,17 +16,17 @@ default: build
 build:
 	@echo "--> Compiling the project"
 	mkdir -p bin
-	${GODEPS} go build -o bin/${NAME}
+	${GODEPS} go build -o bin/${NAME} cmd/${NAME}/*.go
 
 static:
 	@echo "--> Compiling the static binary"
 	mkdir -p bin
-	CGO_ENABLED=0 GOOS=linux ${GODEPS} go build -a -tags netgo -ldflags '-w' -o bin/${NAME}
+	CGO_ENABLED=0 GOOS=linux ${GODEPS} go build -a -tags netgo -ldflags '-w' -o bin/${NAME} cmd/${NAME}/*.go
 
 docker-build:
 	@echo "--> Compiling the project"
 	sudo docker run --rm -v ${ROOT_DIR}:/go/src/github.com/gambol99/${NAME} \
-		-w /go/src/github.com/gambol99/${NAME} -e GOOS=linux golang:${GOVERSION} make static
+		-w /go/src/github.com/gambol99/${NAME}/ -e GOOS=linux golang:${GOVERSION} make static
 
 docker: static
 	@echo "--> Building the docker image"
@@ -54,7 +54,7 @@ vet:
 	@go tool vet 2>/dev/null ; if [ $$? -eq 3 ]; then \
 		go get golang.org/x/tools/cmd/vet; \
 	fi
-	@go tool vet $(VETARGS) *.go
+	@go tool vet $(VETARGS) ./..
 
 lint:
 	@echo "--> Running golint"
@@ -74,7 +74,6 @@ cover:
 test: deps
 	@echo "--> Running the tests"
 	${GODEPS} go test -v ${PACKAGES}
-	@$(MAKE) vet
 	@$(MAKE) cover
 
 changelog: release

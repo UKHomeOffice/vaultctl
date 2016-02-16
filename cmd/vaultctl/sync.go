@@ -22,8 +22,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gambol99/vaultctl/api"
-	"github.com/gambol99/vaultctl/utils"
+	"github.com/gambol99/vaultctl/pkg/api"
+	"github.com/gambol99/vaultctl/pkg/utils"
+	"github.com/gambol99/vaultctl/pkg/vault"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -32,10 +33,20 @@ import (
 )
 
 type syncCommand struct {
-	// a collection of config files
-	configFiles []string
+	// a collection of users
+	users []*api.User
+	// a collection of backends
+	backends []*api.Backend
+	// a collection of secrets
+	secrets []*api.Secret
 	// a collection of polices files
 	policyFiles []string
+	// a list of configuration files
+	configFiles []string
+	// the vault transit backend
+	transit string
+	// the vault client
+	client *vault.Client
 	// whether to skip applying the users to vault
 	skipUsers bool
 	// whether to skip applying the backend's to vault
@@ -53,54 +64,51 @@ func newSyncCommand() cli.Command {
 	return new(syncCommand).getCommand()
 }
 
-func (r syncCommand) action(cx *cli.Context, f *factory) error {
+func (r syncCommand) action(cx *cli.Context) error {
 	startTime := time.Now()
-
 	// step: valid the command line options
 	if err := r.validateAction(cx); err != nil {
 		return err
 	}
+	// step: get a vault client
+	client, err := getVaultClient(cx)
+	if err != nil {
+		return err
+	}
+	r.client = client
 
-	// step: sync the policies
+	// step: parse the configuration files
+	if err := r.parseConfigFiles(); err != nil {
+		return err
+	}
 	if !r.skipPolicies {
-		err := r.syncPolicies(r.policyFiles, f)
-		if err != nil && !r.skipErrors {
+		if err := r.applyPolicies(r.policyFiles); err != nil {
 			return err
 		}
 	}
-
-	// step: read in the configuration files
-	for _, c := range r.configFiles {
-		config := new(api.Config)
-		// step: decode the configuration file
-		err := utils.DecodeConfig(c, config)
-		if err != nil && !r.skipErrors {
-			return fmt.Errorf("failed to parse the configuration file: %s, error: %s", c, err)
-		}
-		if !r.skipUsers && len(config.Users) > 0 {
-			if err := r.syncUsers(config.Users, f); err != nil {
-				return err
-			}
-		}
-		if !r.skipBackends && len(config.Backends) > 0 {
-			if err := r.syncBackends(config.Backends, f); err != nil {
-				return err
-			}
-		}
-		if !r.skipSecrets && len(config.Secrets) > 0 {
-			if err := r.syncSecrets(config.Secrets, f); err != nil {
-				return err
-			}
+	if !r.skipUsers {
+		if err := r.applyUsers(r.users); err != nil {
+			return err
 		}
 	}
-
+	if !r.skipBackends {
+		if err := r.applyBackends(r.backends); err != nil {
+			return err
+		}
+	}
+	if !r.skipSecrets {
+		if err := r.applySecrets(r.secrets); err != nil {
+			return err
+		}
+	}
 	log.Infof("synchronization complete, time took: %s", time.Now().Sub(startTime).String())
 
 	return nil
 }
 
-func (r syncCommand) syncPolicies(policies []string, f *factory) error {
-	log.Infof("%s", color.GreenString("-> synchronizing the vault policies"))
+// applyPolicies applies the policies to a vault instance
+func (r syncCommand) applyPolicies(policies []string) error {
+	log.Infof("%s", color.GreenString("-> synchronizing the vault policies, %d files", len(r.policyFiles)))
 
 	for _, p := range r.policyFiles {
 		name := filepath.Base(p)
@@ -113,7 +121,7 @@ func (r syncCommand) syncPolicies(policies []string, f *factory) error {
 			log.Warnf("unable to read the policy file: %s, error: %s, skipping", p, err)
 			continue
 		}
-		if err := f.client.SetPolicy(name, string(content)); err != nil {
+		if err := r.client.SetPolicy(name, string(content)); err != nil {
 			if !r.skipErrors {
 				return err
 			}
@@ -127,9 +135,9 @@ func (r syncCommand) syncPolicies(policies []string, f *factory) error {
 	return nil
 }
 
-// syncUsers synchronizes the
-func (r syncCommand) syncUsers(users []*api.User, f *factory) error {
-	log.Infof("%s", color.GreenString("-> synchronizing the vault users"))
+// applyUsers synchronizes the users with vault
+func (r syncCommand) applyUsers(users []*api.User) error {
+	log.Infof("%s", color.GreenString("-> synchronizing the vault users, users: %d", len(users)))
 
 	for _, x := range users {
 		// step: validate the user
@@ -142,7 +150,7 @@ func (r syncCommand) syncUsers(users []*api.User, f *factory) error {
 		log.Infof("[user: %s] ensuring user, policies: %s", x.UserPass.Username, x.GetPolicies())
 
 		// step: attempt to add the user
-		if err := f.client.AddUser(x); err != nil {
+		if err := r.client.AddUser(x); err != nil {
 			if !r.skipErrors {
 				return err
 			}
@@ -154,11 +162,10 @@ func (r syncCommand) syncUsers(users []*api.User, f *factory) error {
 }
 
 // syncBackends synchronizes the backend's with vault
-func (r syncCommand) syncBackends(backends []*api.Backend, f *factory) error {
-	log.Infof("%s", color.GreenString("-> synchronizing the backends"))
+func (r syncCommand) applyBackends(backends []*api.Backend) error {
+	log.Infof("%s", color.GreenString("-> synchronizing the backends, backend: %d", len(backends)))
 
 	for _, backend := range backends {
-		// step: validate the backend
 		if err := backend.IsValid(); err != nil {
 			if !r.skipErrors {
 				return err
@@ -166,12 +173,11 @@ func (r syncCommand) syncBackends(backends []*api.Backend, f *factory) error {
 			log.Warningf("backend is invalid: %s", err)
 			continue
 		}
-
 		// step: get the backend path
 		path := backend.GetPath()
 
 		// step: get a list of mounts
-		mounted, err := f.client.Mounts()
+		mounted, err := r.client.Mounts()
 		if err != nil {
 			return err
 		}
@@ -180,7 +186,7 @@ func (r syncCommand) syncBackends(backends []*api.Backend, f *factory) error {
 		_, found := mounted[backend.GetPath()+"/"]
 		if !found {
 			log.Infof("[backend: %s] creating backend", path)
-			if err := f.client.Client().Sys().Mount(path, &v.MountInput{
+			if err := r.client.Client().Sys().Mount(path, &v.MountInput{
 				Type:        backend.Type,
 				Description: backend.Description,
 				Config: v.MountConfigInput{
@@ -212,7 +218,7 @@ func (r syncCommand) syncBackends(backends []*api.Backend, f *factory) error {
 
 			log.Infof("[backend->config: %s] applying configuration for backend", uri)
 
-			resp, err := f.client.Request("PUT", uri, &c)
+			resp, err := r.client.Request("PUT", uri, &c)
 			if err != nil {
 				if !r.skipErrors {
 					return err
@@ -232,9 +238,9 @@ func (r syncCommand) syncBackends(backends []*api.Backend, f *factory) error {
 	return nil
 }
 
-// syncSecrets synchronizes the secrets in vault
-func (r *syncCommand) syncSecrets(secrets []*api.Secret, f *factory) error {
-	log.Infof("%s", color.GreenString("-> synchronizing the secrets with vault"))
+// applySecrets synchronizes the secrets in vault
+func (r *syncCommand) applySecrets(secrets []*api.Secret) error {
+	log.Infof("%s", color.GreenString("-> synchronizing the secrets with vault, secrets: %d", len(secrets)))
 	for _, s := range secrets {
 		// step: validate the secret
 		if err := s.IsValid(); err != nil {
@@ -248,13 +254,33 @@ func (r *syncCommand) syncSecrets(secrets []*api.Secret, f *factory) error {
 		log.Infof("[secret: %s] adding the secret", s.Path)
 
 		// step: apply the secret
-		if err := f.client.AddSecret(s); err != nil {
+		if err := r.client.AddSecret(s); err != nil {
 			if r.skipErrors {
 				log.Warningf("failed to add the secret: %s, error: %s", s.Path, err)
 				continue
 			}
 			return err
 		}
+	}
+
+	return nil
+}
+
+// parseConfigFiles reads a series of configuration files or directories and extracts the
+// items from them
+func (r *syncCommand) parseConfigFiles() error {
+	// step: iterate the configuration files and decode
+	for _, c := range r.configFiles {
+		cfg := new(api.Config)
+
+		if err := utils.DecodeFile(c, cfg); err != nil {
+			return fmt.Errorf("unable to decode the file: %s, error: %s", c, err)
+		}
+
+		// step: appends the elements
+		r.users = append(r.users, cfg.Users...)
+		r.backends = append(r.backends, cfg.Backends...)
+		r.secrets = append(r.secrets, cfg.Secrets...)
 	}
 
 	return nil
@@ -268,6 +294,7 @@ func (r *syncCommand) validateAction(cx *cli.Context) error {
 	r.skipSecrets = cx.Bool("skip-secrets")
 	r.skipErrors = cx.Bool("skip-errors")
 	r.configFiles = cx.StringSlice("config")
+	r.transit = cx.String("transit")
 
 	// step: check the skips
 	if r.skipBackends && r.skipPolicies && r.skipUsers {
@@ -283,40 +310,17 @@ func (r *syncCommand) validateAction(cx *cli.Context) error {
 		log.Infof("skipping the synchronization of users")
 	}
 
-	// step: check the config directories
-	for _, x := range cx.StringSlice("config-dir") {
-		if !utils.IsDirectory(x) {
-			return fmt.Errorf("the path %s is not a directory", x)
-		}
-		files, err := filepath.Glob(fmt.Sprintf("%s/%s", x, cx.String("config-extension")))
-		if err != nil {
-			return err
-		}
-		for _, j := range files {
-			if !utils.IsFile(j) {
-				continue
-			}
-			r.configFiles = append(r.configFiles, j)
-		}
-
+	// step: get the files from any config directories
+	files, err := utils.FindFilesInDirectory(cx.StringSlice("config-dir"), cx.String("config-extension"))
+	if err != nil {
+		return err
 	}
+	r.configFiles = append(r.configFiles, files...)
 
-	// step: check the config directories
-	for _, x := range cx.StringSlice("policies") {
-		if !utils.IsDirectory(x) {
-			return fmt.Errorf("the path %s is not a directory", x)
-		}
-		files, err := filepath.Glob(fmt.Sprintf("%s/%s", x, cx.String("policy-extension")))
-		if err != nil {
-			return err
-		}
-		log.Infof("found %d files under policies directory: %s", len(files), x)
-		for _, j := range files {
-			if !utils.IsFile(j) {
-				continue
-			}
-			r.policyFiles = append(r.policyFiles, j)
-		}
+	// step: get a list of policy files from the directories
+	r.policyFiles, err = utils.FindFilesInDirectory(cx.StringSlice("policies"), cx.String("policy-extension"))
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -343,6 +347,10 @@ func (r syncCommand) getCommand() cli.Command {
 			cli.StringSliceFlag{
 				Name:  "p, policies",
 				Usage: "the path to a directory containing one of more policy files",
+			},
+			cli.StringFlag{
+				Name:  "t, transit",
+				Usage: "the vault transit endpoint we should use to decrypt the files",
 			},
 			cli.BoolFlag{
 				Name:  "skip-policies",

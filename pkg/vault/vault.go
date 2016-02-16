@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gambol99/vaultctl/api"
-	"github.com/gambol99/vaultctl/utils"
+	"github.com/gambol99/vaultctl/pkg/api"
+	"github.com/gambol99/vaultctl/pkg/utils"
 
 	log "github.com/Sirupsen/logrus"
 	v "github.com/hashicorp/vault/api"
@@ -34,7 +34,7 @@ const (
 )
 
 func New(hostname, username, password, filename string) (*Client, error) {
-	log.Infof("create vault client to host: %s", hostname)
+	log.Debugf("create vault client to host: %s", hostname)
 	// step: create the credentials
 	creds := &api.UserCredentials{
 		Username: username,
@@ -43,7 +43,7 @@ func New(hostname, username, password, filename string) (*Client, error) {
 	// step: do we have a credentials file?
 	if filename != "" {
 		creds = new(api.UserCredentials)
-		if err := utils.DecodeConfig(filename, creds); err != nil {
+		if err := utils.DecodeFile(filename, creds); err != nil {
 			return nil, err
 		}
 		if err := creds.IsValid(); err != nil {
@@ -173,7 +173,7 @@ func (r *Client) Request(method, uri string, body interface{}) (*http.Response, 
 }
 
 func (r *Client) userLogin(credentials *api.UserCredentials) (string, error) {
-	log.Infof("logging into vault service, username: %s", credentials.Username)
+	log.Debugf("logging into vault service, username: %s", credentials.Username)
 	var param struct {
 		// Password is the password for the account
 		Password string `json:"password"`

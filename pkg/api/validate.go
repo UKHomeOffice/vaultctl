@@ -20,7 +20,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/gambol99/vaultctl/utils"
+	"github.com/gambol99/vaultctl/pkg/utils"
 )
 
 var (

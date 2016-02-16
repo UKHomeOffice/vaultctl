@@ -1,3 +1,6 @@
+*.enc
+platform.yml
+
 # Intellij
 *.iml
 .idea/

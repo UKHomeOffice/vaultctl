@@ -15,20 +15,9 @@ limitations under the License.
 
 package main
 
-import (
-	"github.com/gambol99/vaultctl/vault"
-)
+import "os"
 
-const (
-	// Author is the author of the program
-	Author = "Rohith"
-	// Email is the email of the author
-	Email = "gambol99@gmail.com"
-	// Version is the version
-	Version = "v0.0.1"
-)
-
-type factory struct {
-	// the vault client
-	client *vault.Client
+func main() {
+	app := newVaultCtl()
+	app.Run(os.Args)
 }

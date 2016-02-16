@@ -16,31 +16,46 @@ limitations under the License.
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v2"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-// DecodeConfig unmarshal's the configuration file
-func DecodeConfig(path string, data interface{}) error {
-	// step: read in the content
+// DecodeFile decodes the file
+func DecodeFile(path string, data interface{}) error {
+	// step: read in the file contents
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
+	format := strings.TrimPrefix(filepath.Ext(path), ".")
 
-	switch filepath.Ext(path) {
-	case ".json":
+	return DecodeConfig(bytes.NewReader(content), format, data)
+}
+
+// DecodeConfig unmarshal's the configuration file
+func DecodeConfig(reader io.Reader, format string, data interface{}) error {
+	// step: read in the content
+	content, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return err
+	}
+
+	switch format {
+	case "json":
 		err = json.Unmarshal(content, data)
-	case ".yml":
+	case "yml":
 		fallthrough
-	case ".yaml":
+	case "yaml":
 		err = yaml.Unmarshal(content, data)
 	default:
-		return fmt.Errorf("unsupported config file content, extension: %s", filepath.Ext(path))
+		return fmt.Errorf("unsupported file format: %s", format)
 	}
 
 	if err != nil {
@@ -48,6 +63,43 @@ func DecodeConfig(path string, data interface{}) error {
 	}
 
 	return nil
+}
+
+func FindFilesInDirectory(paths []string, glob string) ([]string, error) {
+	var list []string
+
+	for _, d := range paths {
+		if !IsDirectory(d) {
+			return list, fmt.Errorf("the path %s is not a directory", d)
+		}
+
+		files, err := FindFiles(d, glob)
+		if err != nil {
+			return list, err
+		}
+
+		list = append(list, files...)
+	}
+
+	return list, nil
+}
+
+// FindFiles retrieves a bunch of files from a directory
+func FindFiles(path, glob string) ([]string, error) {
+	var list []string
+	files, err := filepath.Glob(fmt.Sprintf("%s/%s", path, glob))
+	if err != nil {
+		return list, err
+	}
+	for _, j := range files {
+		if !IsFile(j) {
+			continue
+		}
+
+		list = append(list, j)
+	}
+
+	return list, err
 }
 
 // ContainedIn checks if a value in a list of a strings

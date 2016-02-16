@@ -15,9 +15,11 @@ limitations under the License.
 
 package main
 
-import "os"
-
-func main() {
-	app := newVaultConfig()
-	app.Run(os.Args)
-}
+const (
+	// Author is the author of the program
+	Author = "Rohith"
+	// Email is the email of the author
+	Email = "gambol99@gmail.com"
+	// Version is the version
+	Version = "v0.0.1"
+)
