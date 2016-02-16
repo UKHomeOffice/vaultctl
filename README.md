@@ -27,16 +27,14 @@ AUTHOR(S):
    
 COMMANDS:
    synchronize, sync	synchonrize the users, policies, secrets and backends
+   transit, tr, trans	Encrypts / decrypts files using the Vault transit backend
    help, h		Shows a list of commands or help for one command
    
 GLOBAL OPTIONS:
    -A, --vault-addr "http://127.0.0.1:8200"	the url address of the vault service [$VAULT_ADDR]
    -u, --vault-username 			the vault username to use to authenticate to vault service [$VAULT_USERNAME]
-   -t, --vault-password 			the vault password to use to authenticate to vault service [$VAULT_PASSWORD]
+   -p, --vault-password 			the vault password to use to authenticate to vault service [$VAULT_PASSWORD]
    -c, --credentials 				the path to a file (json|yaml) containing the username and password for userpass authenticaion [$VAULT_CRENDENTIALS]
-   -k, --kubeconfig "/home/jest/.kube.config"	the path to a file containing the kubeconfig for kubernetes authentication [$KUBE_CONFIG]
-   -C, --kube-context 				the kube context to use for authenticating to the api [$KUBE_CONTEXT]
-   -H, --kube-api 				the url for the kubernetes api used to polulate the vault secrets [$KUBE_API]
    --verbose					switch on verbose logging for debug purposed
    --kube-populate				whether or not to populate the vault crendentials into the namespaces
    --help, -h					show help
@@ -118,8 +116,29 @@ secrets:
       rohith: yes
 ```      
 
+###### - **Example Output**
+
+```shell
+[jest@starfury vaultctl]$ bin/vaultctl -u admin -p password  sync -p tests/policies -c platform.yml
+INFO[0000] -> synchronizing the vault policies, 3 files 
+INFO[0001] [policy: common.hcl] successfully applied the policy, filename: tests/policies/common.hcl 
+INFO[0001] [policy: platform.hcl] successfully applied the policy, filename: tests/policies/platform.hcl 
+INFO[0001] [policy: platform_tls.hcl] successfully applied the policy, filename: tests/policies/platform_tls.hcl 
+INFO[0001] -> synchronizing the vault users, users: 1 
+INFO[0001] [user: rohithj] ensuring user, policies: root 
+INFO[0001] -> synchronizing the backends, backend: 2 
+INFO[0001] [backend: platform/encode]: already exist, moving to configuration 
+INFO[0001] [backend:platform/encode/keys/default] skipping the config, as it's a oneshot setting 
+INFO[0001] [backend: platform/secrets]: already exist, moving to configuration 
+INFO[0001] -> synchronizing the secrets with vault, secrets: 0 
+INFO[0001] synchronization complete, time took: 1.733908869s 
+```
+
+#### **Transit Encryption**
+---
+The sub-command 'transit' permits you to encrypt and decrypt the file contents using a [Vault transit](https://www.vaultproject.io/docs/secrets/transit/index.html) backend. The current use case being we hand off management to others to manage their our namespaces, secret, backends etc and behold a generic endpoint for encryption. 
+
 ##### **TODO**
 ---
 
 - Need to finish off the Kubernetes intregetion to place the vault credentials in k8s secrets.
-- Add the option of encryption to the files 

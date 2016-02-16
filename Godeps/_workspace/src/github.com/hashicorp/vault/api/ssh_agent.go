@@ -3,15 +3,11 @@ package api
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
-	"net"
-	"net/http"
 	"os"
-	"path/filepath"
-	"time"
 
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/hcl"
 	"github.com/mitchellh/mapstructure"
 )
@@ -61,43 +57,16 @@ type SSHAgentConfig struct {
 
 // TLSClient returns a HTTP client that uses TLS verification (TLS 1.2) for a given
 // certificate pool.
-func (c *SSHAgentConfig) TLSClient(certPool *x509.CertPool) *http.Client {
+func (c *SSHAgentConfig) SetTLSParameters(clientConfig *Config, certPool *x509.CertPool) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: c.TLSSkipVerify,
 		MinVersion:         tls.VersionTLS12,
 		RootCAs:            certPool,
 	}
 
-	client := *http.DefaultClient
-	client.Transport = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		TLSClientConfig:     tlsConfig,
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
-
-	// From https://github.com/michiwend/gomusicbrainz/pull/4/files
-	defaultRedirectLimit := 30
-
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if len(via) > defaultRedirectLimit {
-			return fmt.Errorf("%d consecutive requests(redirects)", len(via))
-		}
-		if len(via) == 0 {
-			// No redirects
-			return nil
-		}
-		// mutate the subsequent redirect requests with the first Header
-		if token := via[0].Header.Get("X-Vault-Token"); len(token) != 0 {
-			req.Header.Set("X-Vault-Token", token)
-		}
-		return nil
-	}
-
-	return &client
+	transport := cleanhttp.DefaultTransport()
+	transport.TLSClientConfig = tlsConfig
+	clientConfig.HttpClient.Transport = transport
 }
 
 // NewClient returns a new client for the configuration. This client will be used by the
@@ -116,16 +85,16 @@ func (c *SSHAgentConfig) NewClient() (*Client, error) {
 		var certPool *x509.CertPool
 		var err error
 		if c.CACert != "" {
-			certPool, err = loadCACert(c.CACert)
+			certPool, err = LoadCACert(c.CACert)
 		} else if c.CAPath != "" {
-			certPool, err = loadCAPath(c.CAPath)
+			certPool, err = LoadCAPath(c.CAPath)
 		}
 		if err != nil {
 			return nil, err
 		}
 
-		// Change the configuration to have an HTTP client with TLS enabled.
-		clientConfig.HttpClient = c.TLSClient(certPool)
+		// Enable TLS on the HTTP client information
+		c.SetTLSParameters(clientConfig, certPool)
 	}
 
 	// Creating the client object for the given configuration
@@ -219,75 +188,4 @@ func (c *SSHAgent) Verify(otp string) (*SSHVerifyResponse, error) {
 		return nil, err
 	}
 	return &verifyResp, nil
-}
-
-// Loads the certificate from given path and creates a certificate pool from it.
-func loadCACert(path string) (*x509.CertPool, error) {
-	certs, err := loadCertFromPEM(path)
-	if err != nil {
-		return nil, err
-	}
-
-	result := x509.NewCertPool()
-	for _, cert := range certs {
-		result.AddCert(cert)
-	}
-
-	return result, nil
-}
-
-// Loads the certificates present in the given directory and creates a
-// certificate pool from it.
-func loadCAPath(path string) (*x509.CertPool, error) {
-	result := x509.NewCertPool()
-	fn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		certs, err := loadCertFromPEM(path)
-		if err != nil {
-			return err
-		}
-
-		for _, cert := range certs {
-			result.AddCert(cert)
-		}
-		return nil
-	}
-
-	return result, filepath.Walk(path, fn)
-}
-
-// Creates a certificate from the given path
-func loadCertFromPEM(path string) ([]*x509.Certificate, error) {
-	pemCerts, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	certs := make([]*x509.Certificate, 0, 5)
-	for len(pemCerts) > 0 {
-		var block *pem.Block
-		block, pemCerts = pem.Decode(pemCerts)
-		if block == nil {
-			break
-		}
-		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
-			continue
-		}
-
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return nil, err
-		}
-
-		certs = append(certs, cert)
-	}
-
-	return certs, nil
 }
