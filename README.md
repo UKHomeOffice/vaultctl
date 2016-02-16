@@ -45,6 +45,23 @@ GLOBAL OPTIONS:
 
 The configuration files for vaultctl can be written in json or yml format *(note, it check the file extension to determine the format)*. You can specify multiple configuration files and or multiple directories containing config files. 
 
+###### - **Authentication**
+
+Authentication backends can be created using the following
+
+```YAML
+auths:
+- path: userpass
+  type: userpass
+- path: some/path/users
+  type: userpass
+- path: github
+  type: github
+  attributes:
+  - uri: config
+    organization: SomeOrganization
+```
+
 ###### - **Users**
 
 Users are place in a users: [] collection, the vault authentication type *(at present only userpass is supported, though it would be trivial to add more)* followed by the policies associated to the user
@@ -68,7 +85,7 @@ backends:
 - type: transit
   path: platform/encode
   description: A transit backend used to encrypt configuration files
-  config:
+  attributes:
   - uri: keys/default
     oneshot: true
 - type: generic
@@ -80,7 +97,7 @@ backends:
 - path: platform/pki
   type: pki
   description: Platform PKI backend
-  config:
+  attributes:
   - uri: root/generate/internal
     common_name: example.com
     ttl: 3h
@@ -94,7 +111,7 @@ backends:
 - path: platform/db
   type: mysql
   description: Platform Database
-  config:
+  attributes:
   - uri: config/connection
     value: root:root@tcp(127.0.0.1:3306)/
     oneshot: true

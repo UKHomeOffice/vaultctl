@@ -17,34 +17,32 @@ package api
 
 import "time"
 
+// Attributes is a map of configuration
+type Attributes map[string]string
+
 // Config is the definition for a config file
 type Config struct {
 	// Users is a series of users
 	Users []*User `yaml:"users" json:"users" hcl:"users"`
-	// Backends is a series of backends
+	// Backends is a series of backend's
 	Backends []*Backend `yaml:"backends" json:"backends" hcl:"backends"`
 	// Secrets is a series of secrets
 	Secrets []*Secret `yaml:"secrets" json:"secrets" hcl:"secrets"`
+	// Auths is a series of authentication backend's
+	Auths []*Auth `yaml:"auths" json:"auths" hcl:"auths"`
 }
 
-// User is the definition for a user
-type User struct {
-	// UserPass is the credentials for a userpass auth backend
-	UserPass *UserCredentials `yaml:"userpass" json:"userpass" hcl:"userpass"`
-	// Policies is a list of policies the user has access to
-	Policies []string `yaml:"policies" json:"policies" hcl:"policies"`
-}
-
-// Secret defines a secret
-type Secret struct {
-	// Path is key for this secret
+// Auth defined a authentication backend
+type Auth struct {
+	// Path is the path of the authentication backend
 	Path string `yaml:"path" json:"path" hcl:"path"`
-	// Values is a series of values associated to the secret
-	Values map[string]interface{} `yaml:"values" json:"values" hcl:"values"`
+	// Type is the authentication type
+	Type string `yaml:"type" json:"type" hcl:"type"`
+	// Description is the a description for the backend
+	Description string `yaml:"description" json:"description" hcl:"description"`
+	// Attributes is a map of configurations for the backend
+	Attrs []*Attributes `yaml:"attributes" json:"attributes" hcl:"attributes"`
 }
-
-// BackendConfig is a map of backend configuration
-type BackendConfig map[string]string
 
 // Backend defined the type and configuration for a backend in vault
 type Backend struct {
@@ -58,8 +56,26 @@ type Backend struct {
 	DefaultLeaseTTL time.Duration `yaml:"default-lease-ttl" json:"default-lease-ttl" hcl:"default-lease-ttl"`
 	// MaxLeaseTTL is the max ttl
 	MaxLeaseTTL time.Duration `yaml:"max-lease-ttl" json:"max-lease-ttl" hcl:"max-lease-ttl"`
-	// Config is the configuration of the mountpoint
-	Config []*BackendConfig `yaml:"config" json:"config" hcl:"config"`
+	// Attrs is the configuration of the mount point
+	Attrs []*Attributes `yaml:"attributes" json:"attributes" hcl:"attributes"`
+}
+
+// Secret defines a secret
+type Secret struct {
+	// Path is key for this secret
+	Path string `yaml:"path" json:"path" hcl:"path"`
+	// Values is a series of values associated to the secret
+	Values map[string]interface{} `yaml:"values" json:"values" hcl:"values"`
+}
+
+// User is the definition for a user
+type User struct {
+	// Path is the authentication path for the user
+	Path string `yaml:"path" json:"path" hcl:"path"`
+	// UserPass is the credentials for a userpass auth backend
+	UserPass *UserCredentials `yaml:"userpass" json:"userpass" hcl:"userpass"`
+	// Policies is a list of policies the user has access to
+	Policies []string `yaml:"policies" json:"policies" hcl:"policies"`
 }
 
 // UserCredentials are the userpass credentials

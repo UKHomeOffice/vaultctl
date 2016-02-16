@@ -106,33 +106,6 @@ func (r *Client) AddSecret(secret *api.Secret) error {
 	return nil
 }
 
-// AddUser adds a user to vault
-func (r *Client) AddUser(user *api.User) error {
-	if user.UserPass != nil {
-		if err := user.UserPass.IsValid(); err != nil {
-			return err
-		}
-		uri := fmt.Sprintf("auth/userpass/users/%s", user.UserPass.Username)
-		var params struct {
-			Password string `json:"password"`
-			Policies string `json:"policies"`
-		}
-		params.Password = user.UserPass.Password
-		params.Policies = strings.Join(user.Policies, ",")
-
-		resp, err := r.Request("PUT", uri, &params)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusNoContent {
-			return fmt.Errorf("unable to add user: %s", resp.Body)
-		}
-		return nil
-	}
-
-	return nil
-}
 
 // Mounts is a list of mounts
 func (r *Client) Mounts() (map[string]*v.MountOutput, error) {

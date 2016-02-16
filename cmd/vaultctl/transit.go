@@ -152,7 +152,7 @@ func (r *transitCommand) decryptContent() error {
 			continue
 		}
 		log.Infof("saving the decrypted content from: %s, to: %s", f, filename)
-		file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0740)
+		file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0640)
 		if err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ func (r *transitCommand) getCommand() cli.Command {
 				Destination: &r.stdout,
 			},
 			cli.BoolFlag{
-				Name:        "delete-files",
+				Name:        "delete",
 				Usage:       "delete the plaintext files after content encrypted",
 				Destination: &r.deleteFiles,
 			},
