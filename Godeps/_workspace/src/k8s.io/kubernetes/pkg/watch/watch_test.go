@@ -18,13 +18,11 @@ package watch
 
 import (
 	"testing"
-
-	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 type testType string
 
-func (obj testType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (testType) IsAnAPIObject() {}
 
 func TestFake(t *testing.T) {
 	f := NewFake()

@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func BenchmarkPodConversion(b *testing.B) {
@@ -31,18 +30,18 @@ func BenchmarkPodConversion(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var pod api.Pod
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &pod); err != nil {
+	if err := api.Scheme.DecodeInto(data, &pod); err != nil {
 		b.Fatalf("Unexpected error decoding pod: %v", err)
 	}
 
-	scheme := api.Scheme
+	scheme := api.Scheme.Raw()
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Default.GroupVersion().String())
+		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Default.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion().String())
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -59,18 +58,18 @@ func BenchmarkNodeConversion(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var node api.Node
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &node); err != nil {
+	if err := api.Scheme.DecodeInto(data, &node); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
-	scheme := api.Scheme
+	scheme := api.Scheme.Raw()
 	var result *api.Node
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Default.GroupVersion().String())
+		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Default.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion().String())
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -87,18 +86,18 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var replicationController api.ReplicationController
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &replicationController); err != nil {
+	if err := api.Scheme.DecodeInto(data, &replicationController); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
-	scheme := api.Scheme
+	scheme := api.Scheme.Raw()
 	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Default.GroupVersion().String())
+		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Default.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		obj, err := scheme.ConvertToVersion(versionedObj, testapi.Default.InternalGroupVersion().String())
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}

@@ -22,17 +22,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestNewClient(t *testing.T) {
-	o := NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
-	if err := AddObjectsFromPath("../../../../examples/guestbook/frontend-service.yaml", o, api.Codecs.UniversalDecoder()); err != nil {
+	o := NewObjects(api.Scheme, api.Scheme)
+	if err := AddObjectsFromPath("../../../../examples/guestbook/frontend-service.yaml", o, api.Scheme); err != nil {
 		t.Fatal(err)
 	}
 	client := &Fake{}
 	client.AddReactor("*", "*", ObjectReaction(o, testapi.Default.RESTMapper()))
-	list, err := client.Services("test").List(api.ListOptions{})
+	list, err := client.Services("test").List(labels.Everything())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +42,7 @@ func TestNewClient(t *testing.T) {
 	}
 
 	// When list is invoked a second time, the same results are returned.
-	list, err = client.Services("test").List(api.ListOptions{})
+	list, err = client.Services("test").List(labels.Everything())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,23 +53,23 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
-	o := NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
+	o := NewObjects(api.Scheme, api.Scheme)
 	o.Add(&api.List{
 		Items: []runtime.Object{
 			// This first call to List will return this error
-			&(errors.NewNotFound(api.Resource("ServiceList"), "").(*errors.StatusError).ErrStatus),
+			&(errors.NewNotFound("ServiceList", "").(*errors.StatusError).ErrStatus),
 			// The second call to List will return this error
-			&(errors.NewForbidden(api.Resource("ServiceList"), "", nil).(*errors.StatusError).ErrStatus),
+			&(errors.NewForbidden("ServiceList", "", nil).(*errors.StatusError).ErrStatus),
 		},
 	})
 	client := &Fake{}
 	client.AddReactor("*", "*", ObjectReaction(o, testapi.Default.RESTMapper()))
-	_, err := client.Services("test").List(api.ListOptions{})
+	_, err := client.Services("test").List(labels.Everything())
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	t.Logf("error: %#v", err.(*errors.StatusError).Status())
-	_, err = client.Services("test").List(api.ListOptions{})
+	_, err = client.Services("test").List(labels.Everything())
 	if !errors.IsForbidden(err) {
 		t.Fatalf("unexpected error: %v", err)
 	}

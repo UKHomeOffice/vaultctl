@@ -45,14 +45,6 @@ func TestProxyTransport(t *testing.T) {
 		Host:        "foo.com",
 		PathPrepend: "/proxy/minion/minion1:8080",
 	}
-	emptyHostTransport := &Transport{
-		Scheme:      "https",
-		PathPrepend: "/proxy/minion/minion1:10250",
-	}
-	emptySchemeTransport := &Transport{
-		Host:        "foo.com",
-		PathPrepend: "/proxy/minion/minion1:10250",
-	}
 	type Item struct {
 		input        string
 		sourceURL    string
@@ -166,22 +158,6 @@ func TestProxyTransport(t *testing.T) {
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
-		"no host": {
-			input:        "<html></html>",
-			sourceURL:    "http://myminion.com/logs/log.log",
-			transport:    emptyHostTransport,
-			output:       "<html></html>",
-			contentType:  "text/html",
-			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
-		},
-		"no scheme": {
-			input:        "<html></html>",
-			sourceURL:    "http://myminion.com/logs/log.log",
-			transport:    emptySchemeTransport,
-			output:       "<html></html>",
-			contentType:  "text/html",
-			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
-		},
 	}
 
 	testItem := func(name string, item *Item) {
@@ -190,25 +166,11 @@ func TestProxyTransport(t *testing.T) {
 			if got, want := r.Header.Get("X-Forwarded-Uri"), item.forwardedURI; got != want {
 				t.Errorf("%v: X-Forwarded-Uri = %q, want %q", name, got, want)
 			}
-			if len(item.transport.Host) == 0 {
-				_, present := r.Header["X-Forwarded-Host"]
-				if present {
-					t.Errorf("%v: X-Forwarded-Host header should not be present", name)
-				}
-			} else {
-				if got, want := r.Header.Get("X-Forwarded-Host"), item.transport.Host; got != want {
-					t.Errorf("%v: X-Forwarded-Host = %q, want %q", name, got, want)
-				}
+			if got, want := r.Header.Get("X-Forwarded-Host"), item.transport.Host; got != want {
+				t.Errorf("%v: X-Forwarded-Host = %q, want %q", name, got, want)
 			}
-			if len(item.transport.Scheme) == 0 {
-				_, present := r.Header["X-Forwarded-Proto"]
-				if present {
-					t.Errorf("%v: X-Forwarded-Proto header should not be present", name)
-				}
-			} else {
-				if got, want := r.Header.Get("X-Forwarded-Proto"), item.transport.Scheme; got != want {
-					t.Errorf("%v: X-Forwarded-Proto = %q, want %q", name, got, want)
-				}
+			if got, want := r.Header.Get("X-Forwarded-Proto"), item.transport.Scheme; got != want {
+				t.Errorf("%v: X-Forwarded-Proto = %q, want %q", name, got, want)
 			}
 
 			// Send response.
@@ -219,8 +181,7 @@ func TestProxyTransport(t *testing.T) {
 			w.Header().Set("Content-Type", item.contentType)
 			fmt.Fprint(w, item.input)
 		}))
-		// TODO: Uncomment when fix #19254
-		// defer server.Close()
+		defer server.Close()
 
 		// Replace source URL with our test server address.
 		sourceURL := parseURLOrDie(item.sourceURL)

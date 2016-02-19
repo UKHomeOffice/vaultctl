@@ -21,8 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func BenchmarkPodCopy(b *testing.B) {
@@ -31,7 +29,7 @@ func BenchmarkPodCopy(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var pod api.Pod
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &pod); err != nil {
+	if err := api.Scheme.DecodeInto(data, &pod); err != nil {
 		b.Fatalf("Unexpected error decoding pod: %v", err)
 	}
 
@@ -54,7 +52,7 @@ func BenchmarkNodeCopy(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var node api.Node
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &node); err != nil {
+	if err := api.Scheme.DecodeInto(data, &node); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
@@ -77,7 +75,7 @@ func BenchmarkReplicationControllerCopy(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var replicationController api.ReplicationController
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &replicationController); err != nil {
+	if err := api.Scheme.DecodeInto(data, &replicationController); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 

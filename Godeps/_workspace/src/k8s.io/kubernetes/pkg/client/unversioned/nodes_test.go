@@ -14,12 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned_test
-
-import (
-	. "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
-)
+package unversioned
 
 import (
 	"net/url"
@@ -29,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -37,26 +33,25 @@ func getNodesResourceName() string {
 }
 
 func TestListNodes(t *testing.T) {
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
 		},
-		Response: simple.Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
+		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup(t).Nodes().List(api.ListOptions{})
-	defer c.Close()
+	response, err := c.Setup(t).Nodes().List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
 }
 
 func TestListNodesLabels(t *testing.T) {
-	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
-	c := &simple.Client{
-		Request: simple.Request{
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
+	c := &testClient{
+		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
-			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
-		Response: simple.Response{
+			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+		Response: Response{
 			StatusCode: 200,
 			Body: &api.NodeList{
 				Items: []api.Node{
@@ -73,33 +68,29 @@ func TestListNodesLabels(t *testing.T) {
 		},
 	}
 	c.Setup(t)
-	defer c.Close()
-	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
+	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	options := api.ListOptions{LabelSelector: selector}
-	receivedNodeList, err := c.Nodes().List(options)
+	receivedNodeList, err := c.Nodes().List(selector, fields.Everything())
 	c.Validate(t, receivedNodeList, err)
 }
 
 func TestGetNode(t *testing.T) {
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "1"),
 		},
-		Response: simple.Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
 	}
 	response, err := c.Setup(t).Nodes().Get("1")
-	defer c.Close()
 	c.Validate(t, response, err)
 }
 
 func TestGetNodeWithNoName(t *testing.T) {
-	c := &simple.Client{Error: true}
+	c := &testClient{Error: true}
 	receivedNode, err := c.Setup(t).Nodes().Get("")
-	defer c.Close()
-	if (err != nil) && (err.Error() != simple.NameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
+	if (err != nil) && (err.Error() != nameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
 	}
 
 	c.Validate(t, receivedNode, err)
@@ -120,31 +111,29 @@ func TestCreateNode(t *testing.T) {
 			Unschedulable: false,
 		},
 	}
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "POST",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
 			Body:   requestNode},
-		Response: simple.Response{
+		Response: Response{
 			StatusCode: 200,
 			Body:       requestNode,
 		},
 	}
 	receivedNode, err := c.Setup(t).Nodes().Create(requestNode)
-	defer c.Close()
 	c.Validate(t, receivedNode, err)
 }
 
 func TestDeleteNode(t *testing.T) {
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "DELETE",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Nodes().Delete("foo")
-	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -164,14 +153,13 @@ func TestUpdateNode(t *testing.T) {
 			Unschedulable: true,
 		},
 	}
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "PUT",
 			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
 		},
-		Response: simple.Response{StatusCode: 200, Body: requestNode},
+		Response: Response{StatusCode: 200, Body: requestNode},
 	}
 	response, err := c.Setup(t).Nodes().Update(requestNode)
-	defer c.Close()
 	c.Validate(t, response, err)
 }

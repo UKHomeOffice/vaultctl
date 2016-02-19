@@ -22,8 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type myType struct {
@@ -31,7 +30,7 @@ type myType struct {
 	Value string
 }
 
-func (obj *myType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (*myType) IsAnAPIObject() {}
 
 func TestBroadcaster(t *testing.T) {
 	table := []Event{
@@ -113,7 +112,7 @@ func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 	}(m.Watch(), m.Watch())
 	m.Action(Added, &myType{})
 	select {
-	case <-time.After(wait.ForeverTestTimeout):
+	case <-time.After(util.ForeverTestTimeout):
 		t.Error("timeout: deadlocked")
 	case <-done:
 	}

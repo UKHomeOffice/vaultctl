@@ -23,10 +23,8 @@ import (
 
 	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/util/io"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -34,13 +32,11 @@ func TestSavePodToFile(t *testing.T) {
 	pod := volume.NewPersistentVolumeRecyclerPodTemplate()
 
 	// sets all default values on a pod for equality comparison after decoding from file
-	codec := api.Codecs.LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
-	encoded, err := runtime.Encode(codec, pod)
-	runtime.DecodeInto(codec, encoded, pod)
+	encoded, err := latest.GroupOrDie("").Codec.Encode(pod)
+	latest.GroupOrDie("").Codec.DecodeInto(encoded, pod)
 
-	tmpDir := utiltesting.MkTmpdirOrDie("kube-io-test")
-	defer os.RemoveAll(tmpDir)
-	path := fmt.Sprintf("/%s/kube-io-test-%s", tmpDir, uuid.New())
+	path := fmt.Sprintf("/tmp/kube-io-test-%s", uuid.New())
+	defer os.Remove(path)
 
 	if err := io.SavePodToFile(pod, path, 777); err != nil {
 		t.Fatalf("failed to save pod to file: %v", err)

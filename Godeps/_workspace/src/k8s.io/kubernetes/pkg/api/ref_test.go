@@ -26,14 +26,14 @@ import (
 
 type FakeAPIObject struct{}
 
-func (obj *FakeAPIObject) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (*FakeAPIObject) IsAnAPIObject() {}
 
 type ExtensionAPIObject struct {
 	unversioned.TypeMeta
 	ObjectMeta
 }
 
-func (obj *ExtensionAPIObject) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (*ExtensionAPIObject) IsAnAPIObject() {}
 
 func TestGetReference(t *testing.T) {
 	table := map[string]struct {

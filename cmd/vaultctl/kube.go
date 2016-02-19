@@ -16,12 +16,12 @@ limitations under the License.
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 
 	"github.com/gambol99/vaultctl/pkg/utils"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned"
@@ -89,6 +89,8 @@ func (r *kubeCmd) synchronize() error {
 		if u.Namespace == "" || u.UserPass == nil {
 			continue
 		}
+
+		log.Infof("[kube %s/%s] adding the vault token to namespace", u.Namespace, u.UserPass.Username)
 		cred := &credential{
 			Method:   "userpass",
 			Username: u.UserPass.Username,
@@ -108,7 +110,7 @@ func (r *kubeCmd) synchronize() error {
 				Name:      secretName,
 			},
 			Data: map[string][]byte{
-				dataName: []byte(base64.StdEncoding.EncodeToString(content)),
+				dataName: []byte(content),
 			},
 		}
 
@@ -141,10 +143,7 @@ func (r *kubeCmd) synchronize() error {
 
 // hasSecret check if the secret exists
 func (r *kubeCmd) hasSecret(name, namespace string) (bool, error) {
-	list, err := r.client.Secrets(namespace).List(api.ListOptions{
-		LabelSelector: labels.Everything(),
-		FieldSelector: fields.Everything(),
-	})
+	list, err := r.client.Secrets(namespace).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return false, err
 	}

@@ -28,24 +28,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 )
-
-type streamAndReply struct {
-	httpstream.Stream
-	replySent <-chan struct{}
-}
-
-func waitStreamReply(replySent <-chan struct{}, notify chan<- struct{}, stop <-chan struct{}) {
-	select {
-	case <-replySent:
-		notify <- struct{}{}
-	case <-stop:
-	}
-}
 
 func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, errorData string, tty bool, messageCount int) http.HandlerFunc {
 	// error + stdin + stdout
@@ -63,11 +49,11 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 		if protocol != StreamProtocolV2Name {
 			t.Fatalf("unexpected protocol: %s", protocol)
 		}
-		streamCh := make(chan streamAndReply)
+		streamCh := make(chan httpstream.Stream)
 
 		upgrader := spdy.NewResponseUpgrader()
-		conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream, replySent <-chan struct{}) error {
-			streamCh <- streamAndReply{Stream: stream, replySent: replySent}
+		conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream) error {
+			streamCh <- stream
 			return nil
 		})
 		// from this point on, we can no longer call methods on w
@@ -81,9 +67,6 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 
 		var errorStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
 		receivedStreams := 0
-		replyChan := make(chan struct{})
-		stop := make(chan struct{})
-		defer close(stop)
 	WaitForStreams:
 		for {
 			select {
@@ -92,25 +75,20 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 				switch streamType {
 				case api.StreamTypeError:
 					errorStream = stream
-					go waitStreamReply(stream.replySent, replyChan, stop)
+					receivedStreams++
 				case api.StreamTypeStdin:
 					stdinStream = stream
-					go waitStreamReply(stream.replySent, replyChan, stop)
+					receivedStreams++
 				case api.StreamTypeStdout:
 					stdoutStream = stream
-					go waitStreamReply(stream.replySent, replyChan, stop)
+					receivedStreams++
 				case api.StreamTypeStderr:
 					stderrStream = stream
-					go waitStreamReply(stream.replySent, replyChan, stop)
+					receivedStreams++
 				default:
 					t.Errorf("%d: unexpected stream type: %q", i, streamType)
 				}
 
-				if receivedStreams == expectedStreams {
-					break WaitForStreams
-				}
-			case <-replyChan:
-				receivedStreams++
 				if receivedStreams == expectedStreams {
 					break WaitForStreams
 				}
@@ -211,7 +189,7 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, "", client.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "x"}}, -1, -1, nil)
+		c := client.NewRESTClient(url, "x", nil, -1, -1)
 		req := c.Post().Resource("testing")
 		req.SetHeader(httpstream.HeaderProtocolVersion, StreamProtocolV2Name)
 		req.Param("command", "ls")
@@ -236,15 +214,13 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 				}
 			}
 
-			// TODO: Uncomment when fix #19254
-			// server.Close()
+			server.Close()
 			continue
 		}
 
 		if hasErr {
 			t.Errorf("%d: unexpected error: %v", i, err)
-			// TODO: Uncomment when fix #19254
-			// server.Close()
+			server.Close()
 			continue
 		}
 
@@ -260,8 +236,7 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 			}
 		}
 
-		// TODO: Uncomment when fix #19254
-		// server.Close()
+		server.Close()
 	}
 }
 
@@ -296,7 +271,7 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, 1))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, "", client.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "x"}}, -1, -1, nil)
+		c := client.NewRESTClient(url, "x", nil, -1, -1)
 		req := c.Post().Resource("testing")
 
 		conf := &client.Config{
@@ -319,15 +294,13 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 				}
 			}
 
-			// TODO: Uncomment when fix #19254
-			// server.Close()
+			server.Close()
 			continue
 		}
 
 		if hasErr {
 			t.Errorf("%d: unexpected error: %v", i, err)
-			// TODO: Uncomment when fix #19254
-			// server.Close()
+			server.Close()
 			continue
 		}
 
@@ -343,8 +316,7 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 			}
 		}
 
-		// TODO: Uncomment when fix #19254
-		// server.Close()
+		server.Close()
 	}
 }
 

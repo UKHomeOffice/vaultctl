@@ -57,10 +57,13 @@ func getKubeClient(filename, context string) (*unversioned.Client, error) {
 		return nil, err
 	}
 
-	current, err := clientcmd.NewNonInteractiveClientConfig(*config, context, &clientcmd.ConfigOverrides{}).ClientConfig()
+	current, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{
+		CurrentContext: context}).ClientConfig()
 	if err != nil {
 		return nil, err
 	}
+
+	log.Infof("using the kube api: %s", current.Host)
 
 	// step: create the client
 	client, err := unversioned.New(current)

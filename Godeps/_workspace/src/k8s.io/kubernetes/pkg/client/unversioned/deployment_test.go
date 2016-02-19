@@ -14,26 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned_test
+package unversioned
 
 import (
-	. "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
-)
-
-import (
-	"net/http"
 	"net/url"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func getDeploymentsResourceName() string {
+func getDeploymentsResoureName() string {
 	return "deployments"
 }
 
@@ -45,18 +39,17 @@ func TestDeploymentCreate(t *testing.T) {
 			Namespace: ns,
 		},
 	}
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, ""),
-			Query:  simple.BuildQueryValues(nil),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, ""),
+			Query:  buildQueryValues(nil),
 			Body:   &deployment,
 		},
-		Response: simple.Response{StatusCode: 200, Body: &deployment},
+		Response: Response{StatusCode: 200, Body: &deployment},
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Create(&deployment)
-	defer c.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,18 +64,17 @@ func TestDeploymentGet(t *testing.T) {
 			Namespace: ns,
 		},
 	}
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc"),
-			Query:  simple.BuildQueryValues(nil),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc"),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: deployment},
+		Response: Response{StatusCode: 200, Body: deployment},
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Get("abc")
-	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -98,17 +90,16 @@ func TestDeploymentList(t *testing.T) {
 			},
 		},
 	}
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, ""),
-			Query:  simple.BuildQueryValues(nil),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, ""),
+			Query:  buildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: simple.Response{StatusCode: 200, Body: deploymentList},
+		Response: Response{StatusCode: 200, Body: deploymentList},
 	}
-	response, err := c.Setup(t).Deployments(ns).List(api.ListOptions{})
-	defer c.Close()
+	response, err := c.Setup(t).Deployments(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, response, err)
 }
 
@@ -121,120 +112,41 @@ func TestDeploymentUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	}
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc"),
-			Query:  simple.BuildQueryValues(nil),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc"),
+			Query:  buildQueryValues(nil),
 		},
-		Response: simple.Response{StatusCode: 200, Body: deployment},
+		Response: Response{StatusCode: 200, Body: deployment},
 	}
 	response, err := c.Setup(t).Deployments(ns).Update(deployment)
-	defer c.Close()
-	c.Validate(t, response, err)
-}
-
-func TestDeploymentUpdateStatus(t *testing.T) {
-	ns := api.NamespaceDefault
-	deployment := &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Name:            "abc",
-			Namespace:       ns,
-			ResourceVersion: "1",
-		},
-	}
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc") + "/status",
-			Query:  simple.BuildQueryValues(nil),
-		},
-		Response: simple.Response{StatusCode: 200, Body: deployment},
-	}
-	response, err := c.Setup(t).Deployments(ns).UpdateStatus(deployment)
-	defer c.Close()
 	c.Validate(t, response, err)
 }
 
 func TestDeploymentDelete(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "DELETE",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "foo"),
-			Query:  simple.BuildQueryValues(nil),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "foo"),
+			Query:  buildQueryValues(nil),
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Deployments(ns).Delete("foo", nil)
-	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
 func TestDeploymentWatch(t *testing.T) {
-	c := &simple.Client{
-		Request: simple.Request{
+	c := &testClient{
+		Request: testRequest{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getDeploymentsResourceName(), "", ""),
+			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getDeploymentsResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}},
 		},
-		Response: simple.Response{StatusCode: 200},
+		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(api.ListOptions{})
-	defer c.Close()
+	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
-}
-
-func TestListDeploymentsLabels(t *testing.T) {
-	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Extensions.GroupVersion().String())
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath("deployments", ns, ""),
-			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
-		Response: simple.Response{
-			StatusCode: http.StatusOK,
-			Body: &extensions.DeploymentList{
-				Items: []extensions.Deployment{
-					{
-						ObjectMeta: api.ObjectMeta{
-							Labels: map[string]string{
-								"foo":  "bar",
-								"name": "baz",
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	c.Setup(t)
-	defer c.Close()
-	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
-	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	options := api.ListOptions{LabelSelector: selector}
-	receivedPodList, err := c.Deployments(ns).List(options)
-	c.Validate(t, receivedPodList, err)
-}
-
-func TestDeploymentRollback(t *testing.T) {
-	ns := api.NamespaceDefault
-	deploymentRollback := &extensions.DeploymentRollback{
-		Name:               "abc",
-		UpdatedAnnotations: map[string]string{},
-		RollbackTo:         extensions.RollbackConfig{Revision: 1},
-	}
-	c := &simple.Client{
-		Request: simple.Request{
-			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc") + "/rollback",
-			Query:  simple.BuildQueryValues(nil),
-			Body:   deploymentRollback,
-		},
-		Response: simple.Response{StatusCode: http.StatusOK},
-	}
-	err := c.Setup(t).Deployments(ns).Rollback(deploymentRollback)
-	defer c.Close()
-	c.ValidateCommon(t, err)
 }

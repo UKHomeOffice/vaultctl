@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
@@ -87,7 +87,7 @@ func TestConfirmUsableEmptyConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"invalid configuration: no configuration has been provided"},
+		expectedErrorSubstring: []string{"no context chosen"},
 	}
 
 	test.testConfirmUsable("", t)
@@ -96,7 +96,7 @@ func TestConfirmUsableMissingConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"invalid configuration: no configuration has been provided"},
+		expectedErrorSubstring: []string{"context was not found for"},
 	}
 
 	test.testConfirmUsable("not-here", t)
@@ -104,8 +104,7 @@ func TestConfirmUsableMissingConfig(t *testing.T) {
 func TestValidateEmptyConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
-		config:                 config,
-		expectedErrorSubstring: []string{"invalid configuration: no configuration has been provided"},
+		config: config,
 	}
 
 	test.testConfig(t)
@@ -126,18 +125,6 @@ func TestIsContextNotFound(t *testing.T) {
 
 	err := Validate(*config)
 	if !IsContextNotFound(err) {
-		t.Errorf("Expected context not found, but got %v", err)
-	}
-	if !IsConfigurationInvalid(err) {
-		t.Errorf("Expected configuration invalid, but got %v", err)
-	}
-}
-
-func TestIsEmptyConfig(t *testing.T) {
-	config := clientcmdapi.NewConfig()
-
-	err := Validate(*config)
-	if !IsEmptyConfig(err) {
 		t.Errorf("Expected context not found, but got %v", err)
 	}
 	if !IsConfigurationInvalid(err) {
@@ -190,7 +177,7 @@ func TestValidateEmptyClusterInfo(t *testing.T) {
 	config.Clusters["empty"] = &clientcmdapi.Cluster{}
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"cluster has no server defined"},
+		expectedErrorSubstring: []string{"no server found for"},
 	}
 
 	test.testCluster("empty", t)
@@ -339,14 +326,14 @@ func (c configValidationTest) testContext(contextName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, utilerrors.NewAggregate(errs))
+			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", utilerrors.NewAggregate(errs))
+			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
 		}
 	}
 }
@@ -399,14 +386,14 @@ func (c configValidationTest) testCluster(clusterName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, utilerrors.NewAggregate(errs))
+			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", utilerrors.NewAggregate(errs))
+			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
 		}
 	}
 }
@@ -419,14 +406,14 @@ func (c configValidationTest) testAuthInfo(authInfoName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, utilerrors.NewAggregate(errs))
+			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", utilerrors.NewAggregate(errs))
+			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
 		}
 	}
 }

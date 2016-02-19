@@ -22,14 +22,13 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/util/fielderrors"
 )
 
 func TestErrorNew(t *testing.T) {
-	err := NewAlreadyExists(api.Resource("tests"), "1")
+	err := NewAlreadyExists("test", "1")
 	if !IsAlreadyExists(err) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonAlreadyExists)
 	}
@@ -55,47 +54,47 @@ func TestErrorNew(t *testing.T) {
 		t.Errorf("expected to not be %s", unversioned.StatusReasonMethodNotAllowed)
 	}
 
-	if !IsConflict(NewConflict(api.Resource("tests"), "2", errors.New("message"))) {
+	if !IsConflict(NewConflict("test", "2", errors.New("message"))) {
 		t.Errorf("expected to be conflict")
 	}
-	if !IsNotFound(NewNotFound(api.Resource("tests"), "3")) {
+	if !IsNotFound(NewNotFound("test", "3")) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonNotFound)
 	}
-	if !IsInvalid(NewInvalid(api.Kind("Test"), "2", nil)) {
+	if !IsInvalid(NewInvalid("test", "2", nil)) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonInvalid)
 	}
 	if !IsBadRequest(NewBadRequest("reason")) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonBadRequest)
 	}
-	if !IsForbidden(NewForbidden(api.Resource("tests"), "2", errors.New("reason"))) {
+	if !IsForbidden(NewForbidden("test", "2", errors.New("reason"))) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonForbidden)
 	}
 	if !IsUnauthorized(NewUnauthorized("reason")) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonUnauthorized)
 	}
-	if !IsServerTimeout(NewServerTimeout(api.Resource("tests"), "reason", 0)) {
+	if !IsServerTimeout(NewServerTimeout("test", "reason", 0)) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonServerTimeout)
 	}
-	if time, ok := SuggestsClientDelay(NewServerTimeout(api.Resource("tests"), "doing something", 10)); time != 10 || !ok {
+	if time, ok := SuggestsClientDelay(NewServerTimeout("test", "doing something", 10)); time != 10 || !ok {
 		t.Errorf("expected to be %s", unversioned.StatusReasonServerTimeout)
 	}
 	if time, ok := SuggestsClientDelay(NewTimeoutError("test reason", 10)); time != 10 || !ok {
 		t.Errorf("expected to be %s", unversioned.StatusReasonTimeout)
 	}
-	if !IsMethodNotSupported(NewMethodNotSupported(api.Resource("foos"), "delete")) {
+	if !IsMethodNotSupported(NewMethodNotSupported("foo", "delete")) {
 		t.Errorf("expected to be %s", unversioned.StatusReasonMethodNotAllowed)
 	}
 }
 
 func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		Err     *field.Error
+		Err     *fielderrors.ValidationError
 		Details *unversioned.StatusDetails
 	}{
 		{
-			field.Duplicate(field.NewPath("field[0].name"), "bar"),
+			fielderrors.NewFieldDuplicate("field[0].name", "bar"),
 			&unversioned.StatusDetails{
-				Kind: "Kind",
+				Kind: "kind",
 				Name: "name",
 				Causes: []unversioned.StatusCause{{
 					Type:  unversioned.CauseTypeFieldValueDuplicate,
@@ -104,9 +103,9 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			field.Invalid(field.NewPath("field[0].name"), "bar", "detail"),
+			fielderrors.NewFieldInvalid("field[0].name", "bar", "detail"),
 			&unversioned.StatusDetails{
-				Kind: "Kind",
+				Kind: "kind",
 				Name: "name",
 				Causes: []unversioned.StatusCause{{
 					Type:  unversioned.CauseTypeFieldValueInvalid,
@@ -115,9 +114,9 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			field.NotFound(field.NewPath("field[0].name"), "bar"),
+			fielderrors.NewFieldNotFound("field[0].name", "bar"),
 			&unversioned.StatusDetails{
-				Kind: "Kind",
+				Kind: "kind",
 				Name: "name",
 				Causes: []unversioned.StatusCause{{
 					Type:  unversioned.CauseTypeFieldValueNotFound,
@@ -126,9 +125,9 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			field.NotSupported(field.NewPath("field[0].name"), "bar", nil),
+			fielderrors.NewFieldValueNotSupported("field[0].name", "bar", nil),
 			&unversioned.StatusDetails{
-				Kind: "Kind",
+				Kind: "kind",
 				Name: "name",
 				Causes: []unversioned.StatusCause{{
 					Type:  unversioned.CauseTypeFieldValueNotSupported,
@@ -137,9 +136,9 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			field.Required(field.NewPath("field[0].name"), ""),
+			fielderrors.NewFieldRequired("field[0].name"),
 			&unversioned.StatusDetails{
-				Kind: "Kind",
+				Kind: "kind",
 				Name: "name",
 				Causes: []unversioned.StatusCause{{
 					Type:  unversioned.CauseTypeFieldValueRequired,
@@ -151,7 +150,7 @@ func TestNewInvalid(t *testing.T) {
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
 		expected.Causes[0].Message = vErr.ErrorBody()
-		err := NewInvalid(api.Kind("Kind"), "name", field.ErrorList{vErr})
+		err := NewInvalid("kind", "name", fielderrors.ValidationErrorList{vErr})
 		status := err.(*StatusError).ErrStatus
 		if status.Code != 422 || status.Reason != unversioned.StatusReasonInvalid {
 			t.Errorf("%d: unexpected status: %#v", i, status)
@@ -170,7 +169,7 @@ func Test_reasonForError(t *testing.T) {
 
 type TestType struct{}
 
-func (obj *TestType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (*TestType) IsAnAPIObject() {}
 
 func TestFromObject(t *testing.T) {
 	table := []struct {
