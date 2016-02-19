@@ -52,7 +52,9 @@ func (r Auth) IsValid() error {
 	if r.Path == "" {
 		return fmt.Errorf("you must specify a path")
 	}
-
+	if strings.HasSuffix(r.Path, "/") {
+		return fmt.Errorf("path should not end with /")
+	}
 	if !utils.ContainedIn(r.Type, supportAuthTypes) {
 		return fmt.Errorf("auth type: %s is a unsupported auth type", r.Type)
 	}
@@ -68,6 +70,10 @@ func (r Auth) IsValid() error {
 
 // IsValid validates the user is ok
 func (r *User) IsValid() error {
+	if r.Path != "" && strings.HasSuffix(r.Path, "/") {
+		return fmt.Errorf("path should not end with /")
+	}
+
 	if r.UserPass != nil {
 		return r.UserPass.IsValid()
 	}

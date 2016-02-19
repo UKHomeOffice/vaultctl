@@ -18,11 +18,58 @@ package main
 import (
 	"fmt"
 
+	"github.com/gambol99/vaultctl/pkg/api"
 	"github.com/gambol99/vaultctl/pkg/utils"
 	"github.com/gambol99/vaultctl/pkg/vault"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
+
+// parseConfigFiles parses the configuration files and extracts the resources
+func parseConfigFiles(files []string) (*resources, error) {
+	r := new(resources)
+
+	// step: iterate the configuration files and decode
+	for _, c := range files {
+		cfg := new(api.Config)
+		if err := utils.DecodeFile(c, cfg); err != nil {
+			return nil, fmt.Errorf("unable to decode the file: %s, error: %s", c, err)
+		}
+		// step: appends the elements
+		r.users = append(r.users, cfg.Users...)
+		r.backends = append(r.backends, cfg.Backends...)
+		r.secrets = append(r.secrets, cfg.Secrets...)
+		r.auths = append(r.auths, cfg.Auths...)
+	}
+
+	return r, nil
+}
+
+// getKubeClient retrieves a kube client
+func getKubeClient(filename, context string) (*unversioned.Client, error) {
+	log.Infof("loading the kubeconfig from: %s, context: %s", filename, context)
+
+	config, err := clientcmd.LoadFromFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	current, err := clientcmd.NewNonInteractiveClientConfig(*config, context, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// step: create the client
+	client, err := unversioned.New(current)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
 
 // getVaultClient retrieves a vault client for use
 func getVaultClient(cx *cli.Context) (*vault.Client, error) {
@@ -50,8 +97,4 @@ func getVaultClient(cx *cli.Context) (*vault.Client, error) {
 	}
 
 	return client, nil
-}
-
-func decryptTransit(path, key, content string) {
-
 }

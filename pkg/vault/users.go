@@ -16,12 +16,18 @@ limitations under the License.
 package vault
 
 import (
-	"net/http"
 	"fmt"
+	"net/http"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/gambol99/vaultctl/pkg/api"
 )
+
+type userConfig struct {
+	Password string `json:"password"`
+	Policies string `json:"policies"`
+}
 
 // AddUser adds a user to vault
 func (r *Client) AddUser(user *api.User) error {
@@ -39,16 +45,16 @@ func (r *Client) AddUser(user *api.User) error {
 			path = user.Path
 		}
 		uri = fmt.Sprintf("auth/%s/users/%s", path, user.UserPass.Username)
-		var config struct {
-			Password string `json:"password"`
-			Policies string `json:"policies"`
+
+		params = &userConfig{
+			Password: user.UserPass.Password,
+			Policies: strings.Join(user.Policies, ","),
 		}
-		config.Password = user.UserPass.Password
-		config.Policies = strings.Join(user.Policies, ",")
-		params = &config
 	}
 
-	resp, err := r.Request("PUT", uri, &params)
+	log.Debugf("adding the user: %s", params)
+
+	resp, err := r.Request("PUT", uri, params)
 	if err != nil {
 		return err
 	}

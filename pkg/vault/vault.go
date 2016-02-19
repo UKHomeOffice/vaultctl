@@ -106,7 +106,6 @@ func (r *Client) AddSecret(secret *api.Secret) error {
 	return nil
 }
 
-
 // Mounts is a list of mounts
 func (r *Client) Mounts() (map[string]*v.MountOutput, error) {
 	return r.client.Sys().ListMounts()
@@ -136,7 +135,8 @@ func (r *Client) SetPolicy(name, policy string) error {
 // Request performs a request to vault
 func (r *Client) Request(method, uri string, body interface{}) (*http.Response, error) {
 	url := fmt.Sprintf("/%s/%s", apiVersion, strings.TrimPrefix(uri, "/"))
-	log.Debugf("make request to %s %s, body: %v", method, url, body)
+
+	log.Debugf("make request to %s %s, body: %#v", method, url, body)
 	// step: create a request
 	request := r.client.NewRequest(method, url)
 	if err := request.SetJSONBody(body); err != nil {

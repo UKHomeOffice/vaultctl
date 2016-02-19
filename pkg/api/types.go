@@ -76,6 +76,8 @@ type User struct {
 	UserPass *UserCredentials `yaml:"userpass" json:"userpass" hcl:"userpass"`
 	// Policies is a list of policies the user has access to
 	Policies []string `yaml:"policies" json:"policies" hcl:"policies"`
+	// Namespace is optional and used when adding to kubernetes
+	Namespace string `yaml:"namespace" json:"namespace" hcl:"namespace"`
 }
 
 // UserCredentials are the userpass credentials

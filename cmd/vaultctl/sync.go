@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gambol99/vaultctl/pkg/api"
@@ -59,8 +60,12 @@ type syncCommand struct {
 	skipPolicies bool
 	// whether to skip applying the secrets to vault
 	skipSecrets bool
-	// whether to skip on errors and continue
-	skipErrors bool
+	// delete will delete any resources no longer referenced
+	delete bool
+	// policyExtension
+	policyExtension string
+	// configExtension
+	configExtension string
 }
 
 // newSyncCommand create a new sync command
@@ -129,15 +134,15 @@ func (r *syncCommand) synchronize() error {
 // applyAuths applies the auth backends
 func (r *syncCommand) applyAuths(auths []*api.Auth) error {
 	log.Infof("%s", color.GreenString("-> synchronizing the auth backends, %d backends", len(auths)))
+
+	var list []string
+
 	for _, x := range auths {
 		// step: check the backend is valid
 		if err := x.IsValid(); err != nil {
-			if !r.skipErrors {
-				return err
-			}
-			log.Warnf("invalid auth config, error: %s", err)
-			continue
+			return err
 		}
+		list = append(list, x.Path)
 
 		// step: check the backend is mounted
 		mounted, err := r.client.Client().Sys().ListAuth()
@@ -146,14 +151,10 @@ func (r *syncCommand) applyAuths(auths []*api.Auth) error {
 		}
 
 		// step: if not mounted? attempt to mount
-		if _, found := mounted[x.Type+"/"]; !found {
+		if _, found := mounted[x.Path+"/"]; !found {
 			log.Infof("[auth: %s] type: %s is not mounted, attempting to mount now", x.Path, x.Type)
 			if err := r.client.Client().Sys().EnableAuth(x.Path, x.Type, x.Description); err != nil {
-				if !r.skipErrors {
-					return err
-				}
-				log.Warnf("unable to enable the authentication backand: %s, error: %s", x.Path, err)
-				continue
+				return err
 			}
 		} else {
 			log.Infof("[auth: %s] already create, skipping to configuration", x.Path)
@@ -171,17 +172,32 @@ func (r *syncCommand) applyAuths(auths []*api.Auth) error {
 
 			resp, err := r.client.Request("PUT", uri, &c)
 			if err != nil {
-				if !r.skipErrors {
-					return err
-				}
-				log.Warningf("unable to mount auth backend: %s, error: %s", x.Path, err)
-				continue
+				return err
 			}
 			if resp.StatusCode != http.StatusNoContent {
-				if !r.skipErrors {
-					return err
-				}
-				log.Warningf("unable to apply to auth backend: %s, config: %s, error: %s", x.Path, c.URI(), resp.Body)
+				return err
+			}
+		}
+	}
+
+	// step: get a list of backends
+	mounted, err := r.client.Client().Sys().ListAuth()
+	if err != nil {
+		return err
+	}
+
+	for name, _ := range mounted {
+		if utils.ContainedIn(name, []string{"token/"}) {
+			continue
+		}
+
+		if !utils.ContainedIn(strings.TrimSuffix(name, "/"), list) {
+			log.Warnf("[auth: %s] is no longer referenced, delete: %t", name, r.delete)
+			if !r.delete {
+				continue
+			}
+			if err := r.client.Client().Sys().DisableAuth(name); err != nil {
+				return fmt.Errorf("failed to disable the auth: %s, error: %s", name, err)
 			}
 		}
 	}
@@ -193,26 +209,44 @@ func (r *syncCommand) applyAuths(auths []*api.Auth) error {
 func (r *syncCommand) applyPolicies(policies []string) error {
 	log.Infof("%s", color.GreenString("-> synchronizing the vault policies, %d files", len(policies)))
 
+	var list []string
+
 	for _, p := range policies {
 		name := filepath.Base(p)
+		list = append(list, name)
+
 		// step: read in the content
 		content, err := ioutil.ReadFile(p)
 		if err != nil {
-			if !r.skipErrors {
-				return err
-			}
-			log.Warnf("unable to read the policy file: %s, error: %s, skipping", p, err)
-			continue
+			return err
 		}
 		if err := r.client.SetPolicy(name, string(content)); err != nil {
-			if !r.skipErrors {
-				return err
-			}
-			log.Warnf("unable to apply policy: %s, error: %s", name, err)
-			continue
+			return err
 		}
 
 		log.Infof("[policy: %s] successfully applied the policy, filename: %s", name, p)
+	}
+
+	// step: delete any policies no longer referenced
+	p, err := r.client.Client().Sys().ListPolicies()
+	if err != nil {
+		return err
+	}
+
+	for _, x := range p {
+		if utils.ContainedIn(x, []string{"default", "root"}) {
+			continue
+		}
+		// step: check the policy is referenced still
+		if !utils.ContainedIn(x, list) {
+			log.Warningf("[policy: %s] no longer referenced in config, delete: %t", x, r.delete)
+			if !r.delete {
+				continue
+			}
+			if err := r.client.Client().Sys().DeletePolicy(x); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -224,10 +258,7 @@ func (r *syncCommand) applyUsers(users []*api.User) error {
 
 	for _, x := range users {
 		// step: validate the user
-		err := x.IsValid()
-		if err != nil && r.skipErrors {
-			log.Warningf("the user is invalid, error: %s", err)
-		} else if err != nil {
+		if err := x.IsValid(); err != nil {
 			return err
 		}
 		path := x.Path
@@ -235,14 +266,11 @@ func (r *syncCommand) applyUsers(users []*api.User) error {
 			path = "default"
 		}
 
-		log.Infof("[user: %s] path: %s, ensuring user, policies: %s",  x.UserPass.Username, path, x.GetPolicies())
+		log.Infof("[user: %s/%s] ensuring user, policies: %s", path, x.UserPass.Username, x.GetPolicies())
 
 		// step: attempt to add the user
 		if err := r.client.AddUser(x); err != nil {
-			if !r.skipErrors {
-				return err
-			}
-			log.Warningf("[user: %s] failed to add the user, error: %s", x, err)
+			return err
 		}
 	}
 
@@ -253,14 +281,15 @@ func (r *syncCommand) applyUsers(users []*api.User) error {
 func (r *syncCommand) applyBackends(backends []*api.Backend) error {
 	log.Infof("%s", color.GreenString("-> synchronizing the backends, backend: %d", len(backends)))
 
+	var list []string
+
 	for _, backend := range backends {
 		if err := backend.IsValid(); err != nil {
-			if !r.skipErrors {
-				return err
-			}
-			log.Warningf("backend is invalid: %s", err)
-			continue
+			return err
 		}
+		// step: add to the list
+		list = append(list, backend.GetPath())
+
 		// step: get the backend path
 		path := backend.GetPath()
 
@@ -282,11 +311,7 @@ func (r *syncCommand) applyBackends(backends []*api.Backend) error {
 					MaxLeaseTTL:     backend.MaxLeaseTTL.String(),
 				},
 			}); err != nil {
-				if !r.skipErrors {
-					return err
-				}
-				log.Warningf("unable to mount backend: %s, error: %s", path, err)
-				continue
+				return err
 			}
 		} else {
 			log.Infof("[backend: %s]: already exist, moving to configuration", path)
@@ -307,17 +332,32 @@ func (r *syncCommand) applyBackends(backends []*api.Backend) error {
 
 			resp, err := r.client.Request("PUT", uri, &c)
 			if err != nil {
-				if !r.skipErrors {
-					return err
-				}
-				log.Warningf("unable to mount backend: %s, error: %s", path, err)
-				continue
+				return err
 			}
 			if resp.StatusCode != http.StatusNoContent {
-				if !r.skipErrors {
-					return err
-				}
-				log.Warningf("unable to apply config: %s, error: %s", c.URI(), resp.Body)
+				return err
+			}
+		}
+	}
+
+	mounted, err := r.client.Client().Sys().ListMounts()
+	if err != nil {
+		return err
+	}
+
+	// step: remove any backends?
+	for name, _ := range mounted {
+		// step: skip some inbuilt ones
+		if utils.ContainedIn(name, []string{"secret/", "cubbyhole/", "sys/"}) {
+			continue
+		}
+		if !utils.ContainedIn(strings.TrimSuffix(name, "/"), list) {
+			log.Warnf("[backend: %s] no longer referenced, delete: %t", name, r.delete)
+			if !r.delete {
+				continue
+			}
+			if err := r.client.Client().Sys().Unmount(name); err != nil {
+				return fmt.Errorf("failed to unmount the backend: %s, error: %s", name, err)
 			}
 		}
 	}
@@ -328,13 +368,10 @@ func (r *syncCommand) applyBackends(backends []*api.Backend) error {
 // applySecrets synchronizes the secrets in vault
 func (r *syncCommand) applySecrets(secrets []*api.Secret) error {
 	log.Infof("%s", color.GreenString("-> synchronizing the secrets with vault, secrets: %d", len(secrets)))
+
 	for _, s := range secrets {
 		// step: validate the secret
 		if err := s.IsValid(); err != nil {
-			if r.skipErrors {
-				log.Warningf("secret invalid, error: %s", err)
-				continue
-			}
 			return err
 		}
 
@@ -342,10 +379,6 @@ func (r *syncCommand) applySecrets(secrets []*api.Secret) error {
 
 		// step: apply the secret
 		if err := r.client.AddSecret(s); err != nil {
-			if r.skipErrors {
-				log.Warningf("failed to add the secret: %s, error: %s", s.Path, err)
-				continue
-			}
 			return err
 		}
 	}
@@ -353,8 +386,7 @@ func (r *syncCommand) applySecrets(secrets []*api.Secret) error {
 	return nil
 }
 
-// parseConfigFiles reads a series of configuration files or directories and extracts the
-// items from them
+// parseConfigFiles reads a series of configuration files or directories and extracts the items from them
 func (r *syncCommand) parseConfigFiles() error {
 	// step: iterate the configuration files and decode
 	for _, c := range r.configFiles {
@@ -376,13 +408,7 @@ func (r *syncCommand) parseConfigFiles() error {
 
 // validateAction validates the inputs from the command line
 func (r *syncCommand) validateAction(cx *cli.Context) error {
-	r.skipUsers = cx.Bool("skip-users")
-	r.skipPolicies = cx.Bool("skip-policies")
-	r.skipBackends = cx.Bool("skip-backends")
-	r.skipSecrets = cx.Bool("skip-secrets")
-	r.skipErrors = cx.Bool("skip-errors")
 	r.configFiles = cx.StringSlice("config")
-	r.transit = cx.String("transit")
 
 	// step: check the skips
 	if r.skipBackends && r.skipPolicies && r.skipUsers {
@@ -399,14 +425,14 @@ func (r *syncCommand) validateAction(cx *cli.Context) error {
 	}
 
 	// step: get the files from any config directories
-	files, err := utils.FindFilesInDirectory(cx.StringSlice("config-dir"), cx.String("config-extension"))
+	files, err := utils.FindFilesInDirectory(cx.StringSlice("config-dir"), r.configExtension)
 	if err != nil {
 		return err
 	}
 	r.configFiles = append(r.configFiles, files...)
 
 	// step: get a list of policy files from the directories
-	r.policyFiles, err = utils.FindFilesInDirectory(cx.StringSlice("policies"), cx.String("policy-extension"))
+	r.policyFiles, err = utils.FindFilesInDirectory(cx.StringSlice("policies"), r.policyExtension)
 	if err != nil {
 		return err
 	}
@@ -437,38 +463,46 @@ func (r *syncCommand) getCommand() cli.Command {
 				Usage: "the path to a directory containing one of more policy files",
 			},
 			cli.StringFlag{
-				Name:  "t, transit",
-				Usage: "the vault transit endpoint we should use to decrypt the files",
+				Name:        "t, transit",
+				Usage:       "the vault transit endpoint we should use to decrypt the files",
+				Destination: &r.transit,
 			},
 			cli.BoolFlag{
-				Name:  "skip-policies",
-				Usage: "wheather or not to skip synchronizing the policies",
+				Name:        "delete",
+				Usage:       "wheather to delete resources which are no longer referenced",
+				Destination: &r.delete,
 			},
 			cli.BoolFlag{
-				Name:  "skip-users",
-				Usage: "wheather or not to skip synchronizing the vault users",
+				Name:        "skip-policies",
+				Usage:       "wheather or not to skip synchronizing the policies",
+				Destination: &r.skipPolicies,
 			},
 			cli.BoolFlag{
-				Name:  "skip-backends",
-				Usage: "wheather or not to skip synchronizing the backends",
+				Name:        "skip-users",
+				Usage:       "wheather or not to skip synchronizing the vault users",
+				Destination: &r.skipUsers,
 			},
 			cli.BoolFlag{
-				Name:  "skip-secrets",
-				Usage: "wheather or not to skip synchronizing the secrets",
+				Name:        "skip-backends",
+				Usage:       "wheather or not to skip synchronizing the backends",
+				Destination: &r.skipBackends,
 			},
 			cli.BoolFlag{
-				Name:  "skip-error",
-				Usage: "wheather or not to skip errors and attempt to finish regardless",
+				Name:        "skip-secrets",
+				Usage:       "wheather or not to skip synchronizing the secrets",
+				Destination: &r.skipSecrets,
 			},
 			cli.StringFlag{
-				Name:  "policy-extension",
-				Usage: "the file extenions of the policy files",
-				Value: "*.hcl",
+				Name:        "policy-extension",
+				Usage:       "the file extenions of the policy files",
+				Value:       "*.hcl",
+				Destination: &r.policyExtension,
 			},
 			cli.StringFlag{
-				Name:  "config-extension",
-				Usage: "when using a config-dir, the file extension to glob",
-				Value: "*.yml",
+				Name:        "config-extension",
+				Usage:       "when using a config-dir, the file extension to glob",
+				Value:       "*.yml",
+				Destination: &r.configExtension,
 			},
 		},
 	}

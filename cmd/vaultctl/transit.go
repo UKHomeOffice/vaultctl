@@ -195,12 +195,12 @@ func (r *transitCommand) getCommand() cli.Command {
 				Destination: &r.key,
 			},
 			cli.StringSliceFlag{
-				Name:  	     "f, file",
-				Usage:       "the path to a file you wish to encrypt",
+				Name:  "f, file",
+				Usage: "the path to a file you wish to encrypt",
 			},
 			cli.StringSliceFlag{
-				Name:        "D, directory",
-				Usage:       "the path to a directory containing files you wosh to encrypt",
+				Name:  "D, directory",
+				Usage: "the path to a directory containing files you wosh to encrypt",
 			},
 			cli.BoolFlag{
 				Name:        "O, stdout",

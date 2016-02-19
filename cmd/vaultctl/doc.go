@@ -15,6 +15,8 @@ limitations under the License.
 
 package main
 
+import "github.com/gambol99/vaultctl/pkg/api"
+
 const (
 	// Author is the author of the program
 	Author = "Rohith"
@@ -23,3 +25,14 @@ const (
 	// Version is the version
 	Version = "v0.0.3"
 )
+
+type resources struct {
+	// a collection of auths
+	auths []*api.Auth
+	// a collection of users
+	users []*api.User
+	// a collection of backends
+	backends []*api.Backend
+	// a collection of secrets
+	secrets []*api.Secret
+}

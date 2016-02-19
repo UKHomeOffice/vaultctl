@@ -34,6 +34,7 @@ func newVaultCtl() *cli.App {
 	app.Commands = []cli.Command{
 		newSyncCommand(),
 		newTransitCommand(),
+		newKubeCommand(),
 	}
 
 	return app
@@ -76,7 +77,7 @@ func getGlobalOptions() []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:   "t, vault-token",
-			Usage: 	"a vault token used to authenticate to vault service",
+			Usage:  "a vault token used to authenticate to vault service",
 			EnvVar: "VAULT_TOKEN",
 		},
 		cli.StringFlag{
@@ -87,10 +88,6 @@ func getGlobalOptions() []cli.Flag {
 		cli.BoolFlag{
 			Name:  "verbose",
 			Usage: "switch on verbose logging for debug purposed",
-		},
-		cli.BoolFlag{
-			Name:  "kube-populate",
-			Usage: "whether or not to populate the vault crendentials into the namespaces",
 		},
 	}
 }

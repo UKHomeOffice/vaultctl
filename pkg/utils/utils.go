@@ -39,6 +39,28 @@ func DecodeFile(path string, data interface{}) error {
 	return DecodeConfig(bytes.NewReader(content), format, data)
 }
 
+// EncodeConfig marshals the item
+func EncodeConfig(data interface{}, format string) ([]byte, error) {
+	var content []byte
+	var err error
+
+	switch format {
+	case "json":
+		content, err = json.Marshal(data)
+	case "yml":
+		fallthrough
+	case "yaml":
+		content, err = yaml.Marshal(data)
+	default:
+		return []byte(""), fmt.Errorf("unsupported file format: %s", format)
+	}
+	if err != nil {
+		return []byte(""), err
+	}
+
+	return content, nil
+}
+
 // DecodeConfig unmarshal's the configuration file
 func DecodeConfig(reader io.Reader, format string, data interface{}) error {
 	// step: read in the content
