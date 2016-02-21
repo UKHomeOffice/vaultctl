@@ -1,6 +1,7 @@
 *.enc
 platform.yml
 
+/kube.yml
 # Intellij
 *.iml
 .idea/

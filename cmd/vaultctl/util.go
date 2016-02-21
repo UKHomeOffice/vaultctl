@@ -49,24 +49,44 @@ func parseConfigFiles(files []string) (*resources, error) {
 }
 
 // getKubeClient retrieves a kube client
-func getKubeClient(filename, context string) (*unversioned.Client, error) {
-	log.Infof("loading the kubeconfig from: %s, context: %s", filename, context)
+func getKubeClient(cx *cli.Context) (*unversioned.Client, error) {
+	filename := cx.String("kubeconfig")
+	context := cx.String("kube-context")
+	hostname := cx.String("kube-server")
+	token := cx.String("kube-token")
 
-	config, err := clientcmd.LoadFromFile(filename)
-	if err != nil {
-		return nil, err
+	config := new(unversioned.Config)
+
+	// step: are we using a kubeconfig?
+	if filename != "" {
+		log.Infof("loading the kubeconfig from: %s, context: %s, server: %s", filename, context, hostname)
+
+		kube, err := clientcmd.LoadFromFile(filename)
+		if err != nil {
+			return nil, err
+		}
+
+		if config, err = clientcmd.NewDefaultClientConfig(*kube,
+			&clientcmd.ConfigOverrides{
+				CurrentContext: context,
+			},
+		).ClientConfig(); err != nil {
+			return nil, err
+		}
+
+		if hostname != "" {
+			config.Host = hostname
+		}
+	} else {
+		config.BearerToken = token
+		config.Host = hostname
+		config.Insecure = true
 	}
 
-	current, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{
-		CurrentContext: context}).ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	log.Infof("using the kube api: %s", current.Host)
+	log.Infof("using the kube api: %s", config.Host)
 
 	// step: create the client
-	client, err := unversioned.New(current)
+	client, err := unversioned.New(config)
 	if err != nil {
 		return nil, err
 	}

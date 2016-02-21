@@ -32,10 +32,14 @@ import (
 type kubeCmd struct {
 	// the kubernetes client
 	client *unversioned.Client
+	// the kubeHost
+	kubeHost string
 	// the kubeconfig
 	kubeConfig string
 	// the content
 	kubeContext string
+	// the token
+	kubeToken string
 	// perform a dry run
 	dryrun bool
 	// the name of the secret to inject
@@ -64,7 +68,7 @@ func (r *kubeCmd) action(cx *cli.Context) error {
 		return err
 	}
 	// step: connect to kubernetes
-	client, err := getKubeClient(r.kubeConfig, r.kubeContext)
+	client, err := getKubeClient(cx)
 	if err != nil {
 		return err
 	}
@@ -171,13 +175,24 @@ func (r *kubeCmd) validate(cx *cli.Context) error {
 		return fmt.Errorf("you have to specified any configuration files")
 	}
 
-	if r.kubeConfig == "" || !utils.IsFile(r.kubeConfig) {
-		return fmt.Errorf("you have specified a kubeconfig file or it does not exist")
+	if r.kubeConfig != "" {
+		if !utils.IsFile(r.kubeConfig) {
+			return fmt.Errorf("the kubeconfig: %s does not exist", r.kubeConfig)
+		}
+		if r.kubeContext == "" {
+			return fmt.Errorf("you have not specified a kubeconfig context")
+		}
 	}
 
-	if r.kubeContext == "" {
-		return fmt.Errorf("you have not specified a kubeconfig context")
+	if r.kubeConfig == "" {
+		if r.kubeToken == "" {
+			return fmt.Errorf("you need to specify a token if not using a kubeconfig")
+		}
+		if r.kubeHost == "" {
+			return fmt.Errorf("you need to specify a kube api host if not using a kubeconfig")
+		}
 	}
+
 
 	return nil
 }
@@ -196,16 +211,26 @@ func (r *kubeCmd) getCommand() cli.Command {
 				Usage: "the path to a directory containing one of more config files",
 			},
 			cli.StringFlag{
-				Name:        "kubeconfig",
+				Name:        "k, kubeconfig",
 				Usage:       "the path to the kubeconfig which has the credentails to injects credentials",
-				Value:       os.Getenv("HOME") + "/.kube/config",
 				EnvVar:      "KUBECONFIG",
 				Destination: &r.kubeConfig,
 			},
 			cli.StringFlag{
-				Name:        "kube-context",
+				Name:        "x, kube-context",
 				Usage:       "the kubeconfig context to use when connecting",
 				Destination: &r.kubeContext,
+			},
+			cli.StringFlag{
+				Name:        "s, kube-server",
+				Usage:       "the url for the kubernetes api, will override the one in kubeconfig",
+				Destination: &r.kubeHost,
+				EnvVar:      "KUBERNETES_HOST",
+			},
+			cli.StringFlag{
+				Name:	     "T, kube-token",
+				Usage:       "a bearer token to use for kubernetes authentication",
+				Destination: &r.kubeToken,
 			},
 			cli.BoolFlag{
 				Name:        "d, dryrun",
