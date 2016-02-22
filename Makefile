@@ -1,6 +1,6 @@
 
 NAME=vaultctl
-AUTHOR=gambol99
+AUTHOR=UKHomeOffice
 REGISTRY=docker.io
 HARDWARE=$(shell uname -m)
 GODEPS=godep
@@ -25,8 +25,8 @@ static:
 
 docker-build:
 	@echo "--> Compiling the project"
-	sudo docker run --rm -v ${ROOT_DIR}:/go/src/github.com/gambol99/${NAME} \
-		-w /go/src/github.com/gambol99/${NAME}/ -e GOOS=linux golang:${GOVERSION} make static
+	sudo docker run --rm -v ${ROOT_DIR}:/go/src/github.com/UKHomeOffice/${NAME} \
+		-w /go/src/github.com/UKHomeOffice/${NAME}/ -e GOOS=linux golang:${GOVERSION} make static
 
 docker: static
 	@echo "--> Building the docker image"

@@ -15,7 +15,7 @@ limitations under the License.
 
 package main
 
-import "github.com/gambol99/vaultctl/pkg/api"
+import "github.com/UKHomeOffice/vaultctl/pkg/api"
 
 const (
 	// Author is the author of the program

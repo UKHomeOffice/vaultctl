@@ -20,8 +20,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/UKHomeOffice/vaultctl/pkg/api"
+
 	log "github.com/Sirupsen/logrus"
-	"github.com/gambol99/vaultctl/pkg/api"
 )
 
 type userConfig struct {

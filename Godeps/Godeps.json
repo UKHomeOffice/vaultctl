@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/gambol99/vaultctl",
+	"ImportPath": "github.com/UKHomeOffice/vaultctl",
 	"GoVersion": "go1.5.3",
 	"Packages": [
 		"./..."

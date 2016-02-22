@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gambol99/vaultctl/pkg/utils"
+	"github.com/UKHomeOffice/vaultctl/pkg/utils"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"

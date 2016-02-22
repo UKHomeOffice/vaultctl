@@ -22,8 +22,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gambol99/vaultctl/pkg/utils"
-	"github.com/gambol99/vaultctl/pkg/vault"
+	"github.com/UKHomeOffice/vaultctl/pkg/utils"
+	"github.com/UKHomeOffice/vaultctl/pkg/vault"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
