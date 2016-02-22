@@ -46,8 +46,8 @@ type syncCommand struct {
 	policyFiles []string
 	// a list of configuration files
 	configFiles []string
-	// the vault transit backend
-	transit string
+	// whether to perform a full sync
+	fullsync bool
 	// the vault client
 	client *vault.Client
 	// whether to skip applying the auths to vault
@@ -180,24 +180,25 @@ func (r *syncCommand) applyAuths(auths []*api.Auth) error {
 		}
 	}
 
-	// step: get a list of backends
-	mounted, err := r.client.Client().Sys().ListAuth()
-	if err != nil {
-		return err
-	}
-
-	for name, _ := range mounted {
-		if utils.ContainedIn(name, []string{"token/"}) {
-			continue
+	if r.fullsync {
+		// step: get a list of backends
+		mounted, err := r.client.Client().Sys().ListAuth()
+		if err != nil {
+			return err
 		}
-
-		if !utils.ContainedIn(strings.TrimSuffix(name, "/"), list) {
-			log.Warnf("[auth: %s] is no longer referenced, delete: %t", name, r.delete)
-			if !r.delete {
+		for name, _ := range mounted {
+			if utils.ContainedIn(name, []string{"token/"}) {
 				continue
 			}
-			if err := r.client.Client().Sys().DisableAuth(name); err != nil {
-				return fmt.Errorf("failed to disable the auth: %s, error: %s", name, err)
+
+			if !utils.ContainedIn(strings.TrimSuffix(name, "/"), list) {
+				log.Warnf("[auth: %s] is no longer referenced, delete: %t", name, r.delete)
+				if !r.delete {
+					continue
+				}
+				if err := r.client.Client().Sys().DisableAuth(name); err != nil {
+					return fmt.Errorf("failed to disable the auth: %s, error: %s", name, err)
+				}
 			}
 		}
 	}
@@ -227,24 +228,26 @@ func (r *syncCommand) applyPolicies(policies []string) error {
 		log.Infof("[policy: %s] successfully applied the policy, filename: %s", name, p)
 	}
 
-	// step: delete any policies no longer referenced
-	p, err := r.client.Client().Sys().ListPolicies()
-	if err != nil {
-		return err
-	}
-
-	for _, x := range p {
-		if utils.ContainedIn(x, []string{"default", "root"}) {
-			continue
+	if r.fullsync {
+		// step: delete any policies no longer referenced
+		p, err := r.client.Client().Sys().ListPolicies()
+		if err != nil {
+			return err
 		}
-		// step: check the policy is referenced still
-		if !utils.ContainedIn(x, list) {
-			log.Warningf("[policy: %s] no longer referenced in config, delete: %t", x, r.delete)
-			if !r.delete {
+
+		for _, x := range p {
+			if utils.ContainedIn(x, []string{"default", "root"}) {
 				continue
 			}
-			if err := r.client.Client().Sys().DeletePolicy(x); err != nil {
-				return err
+			// step: check the policy is referenced still
+			if !utils.ContainedIn(x, list) {
+				log.Warningf("[policy: %s] no longer referenced in config, delete: %t", x, r.delete)
+				if !r.delete {
+					continue
+				}
+				if err := r.client.Client().Sys().DeletePolicy(x); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -340,24 +343,26 @@ func (r *syncCommand) applyBackends(backends []*api.Backend) error {
 		}
 	}
 
-	mounted, err := r.client.Client().Sys().ListMounts()
-	if err != nil {
-		return err
-	}
-
-	// step: remove any backends?
-	for name, _ := range mounted {
-		// step: skip some inbuilt ones
-		if utils.ContainedIn(name, []string{"secret/", "cubbyhole/", "sys/"}) {
-			continue
+	if r.fullsync {
+		mounted, err := r.client.Client().Sys().ListMounts()
+		if err != nil {
+			return err
 		}
-		if !utils.ContainedIn(strings.TrimSuffix(name, "/"), list) {
-			log.Warnf("[backend: %s] no longer referenced, delete: %t", name, r.delete)
-			if !r.delete {
+
+		// step: remove any backends?
+		for name, _ := range mounted {
+			// step: skip some inbuilt ones
+			if utils.ContainedIn(name, []string{"secret/", "cubbyhole/", "sys/"}) {
 				continue
 			}
-			if err := r.client.Client().Sys().Unmount(name); err != nil {
-				return fmt.Errorf("failed to unmount the backend: %s, error: %s", name, err)
+			if !utils.ContainedIn(strings.TrimSuffix(name, "/"), list) {
+				log.Warnf("[backend: %s] no longer referenced, delete: %t", name, r.delete)
+				if !r.delete {
+					continue
+				}
+				if err := r.client.Client().Sys().Unmount(name); err != nil {
+					return fmt.Errorf("failed to unmount the backend: %s, error: %s", name, err)
+				}
 			}
 		}
 	}
@@ -462,10 +467,10 @@ func (r *syncCommand) getCommand() cli.Command {
 				Name:  "p, policies",
 				Usage: "the path to a directory containing one of more policy files",
 			},
-			cli.StringFlag{
-				Name:        "t, transit",
-				Usage:       "the vault transit endpoint we should use to decrypt the files",
-				Destination: &r.transit,
+			cli.BoolFlag{
+				Name:	     "sync-full",
+				Usage:       "a full sync will also check the resources are still reference and attempt to delete",
+				Destination: &r.fullsync,
 			},
 			cli.BoolFlag{
 				Name:        "delete",
