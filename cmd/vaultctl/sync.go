@@ -269,7 +269,7 @@ func (r *syncCommand) applyUsers(users []*api.User) error {
 			path = "default"
 		}
 
-		log.Infof("[user: %s/%s] ensuring user, policies: %s", path, x.UserPass.Username, x.GetPolicies())
+		log.Infof("[user: %s/%s] ensuring user, policies: %s", path, x.Username(), x.GetPolicies())
 
 		// step: attempt to add the user
 		if err := r.client.AddUser(x); err != nil {

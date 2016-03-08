@@ -28,6 +28,13 @@ users:
   policies:
     - common
     - platform_tls
+- usertoken:
+    id: dskdjksjdksjdksjdksjdksd
+    display-name: password1
+    ttl: 1h
+  policies:
+    - common
+    - platform_tls
 
 backends:
 - type: transit

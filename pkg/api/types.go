@@ -18,7 +18,7 @@ package api
 import "time"
 
 // Attributes is a map of configuration
-type Attributes map[string]string
+type Attributes map[string]interface{}
 
 // Config is the definition for a config file
 type Config struct {
@@ -73,7 +73,9 @@ type User struct {
 	// Path is the authentication path for the user
 	Path string `yaml:"path" json:"path" hcl:"path"`
 	// UserPass is the credentials for a userpass auth backend
-	UserPass *UserCredentials `yaml:"userpass" json:"userpass" hcl:"userpass"`
+	UserPass *UserPass `yaml:"userpass" json:"userpass" hcl:"userpass"`
+	// UserToken is a token struct for this user
+	UserToken *UserToken `yaml:"usertoken" json:"usertoken" hcl:"usertoken"`
 	// Policies is a list of policies the user has access to
 	Policies []string `yaml:"policies" json:"policies" hcl:"policies"`
 	// Namespace is optional and used when adding to kubernetes
@@ -81,9 +83,21 @@ type User struct {
 }
 
 // UserCredentials are the userpass credentials
-type UserCredentials struct {
+type UserPass struct {
 	// Username is the id of the user
 	Username string `yaml:"username" json:"username" hcl:"username"`
 	// Password is the password of the user
 	Password string `yaml:"password" json:"password" hcl:"password"`
+}
+
+// UserToken is the token
+type UserToken struct {
+	// ID is the actual token itselg
+	ID string `yaml:"id" json:"id" hcl:"id"`
+	// TTL is the time duration of the token
+	TTL time.Duration `yaml:"ttl" json:"ttp" hcl:"ttl"`
+	// DisplayName is a generic name for the token
+	DisplayName string `yaml:"display-name" json:"display-name" hcl:"display-name"`
+	// MaxUses is the max number of times the token can be used
+	MaxUses int `yaml:"max-uses" json:"max-uses" hcl:"max-uses"`
 }

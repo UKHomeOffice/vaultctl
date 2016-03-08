@@ -59,7 +59,7 @@ func New(hostname, username, password, filename, token string) (*Client, error) 
 
 	// step: attempt to login
 	if filename != "" {
-		creds := new(api.UserCredentials)
+		creds := new(api.UserPass)
 		if err := utils.DecodeFile(filename, creds); err != nil {
 			return nil, err
 		}
@@ -73,7 +73,7 @@ func New(hostname, username, password, filename, token string) (*Client, error) 
 		}
 		client.SetToken(token)
 	} else if username != "" && password != "" {
-		token, err := service.userLogin(&api.UserCredentials{
+		token, err := service.userLogin(&api.UserPass{
 			Username: username,
 			Password: password,
 		})
@@ -152,7 +152,7 @@ func (r *Client) Request(method, uri string, body interface{}) (*http.Response, 
 	return resp.Response, nil
 }
 
-func (r *Client) userLogin(credentials *api.UserCredentials) (string, error) {
+func (r *Client) userLogin(credentials *api.UserPass) (string, error) {
 	log.Debugf("logging into vault service, username: %s", credentials.Username)
 	var param struct {
 		// Password is the password for the account
