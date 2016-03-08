@@ -51,7 +51,7 @@ func (r Backend) GetMaxTTL() string {
 // URI returns the uri for the config item
 func (r *Attributes) URI() string {
 	x, _ := (*r)["uri"]
-	return x
+	return x.(string)
 }
 
 // IsOneshot checks if the attribute is a oneshot attribute
@@ -61,7 +61,7 @@ func (r *Attributes) IsOneshot() bool {
 }
 
 // Values retrieves the values from the attributes
-func (r *Attributes) Values() map[string]string {
+func (r *Attributes) Values() map[string]interface{} {
 	return (*r)
 }
 
@@ -77,6 +77,17 @@ func (r *Attributes) String() string {
 	}
 
 	return strings.Join(items, ",")
+}
+
+func (r User) Username() string {
+	if r.UserPass != nil {
+		return r.UserPass.Username
+	}
+	if r.UserToken != nil {
+		return r.UserToken.DisplayName
+	}
+
+	return ""
 }
 
 // GetPolicies returns the policies associated to a user

@@ -17,7 +17,6 @@ package api
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/UKHomeOffice/vaultctl/pkg/utils"
@@ -78,16 +77,29 @@ func (r *User) IsValid() error {
 		return r.UserPass.IsValid()
 	}
 
+	if r.UserToken != nil {
+		return r.UserToken.IsValid()
+	}
+
 	return fmt.Errorf("you have not added authentication to the user")
 }
 
 // IsValid validates the user credential is ok
-func (r UserCredentials) IsValid() error {
+func (r UserPass) IsValid() error {
 	if r.Username == "" {
 		return fmt.Errorf("does not have a username")
 	}
 	if r.Password == "" {
 		return fmt.Errorf("does not have a password")
+	}
+
+	return nil
+}
+
+// IsValid checks the user token is valid
+func (r UserToken) IsValid() error {
+	if r.DisplayName == "" {
+		return fmt.Errorf("you must specify a display name for the token")
 	}
 
 	return nil
@@ -133,21 +145,6 @@ func (r Backend) IsValid() error {
 			// step: ensure the config has a uri
 			if x.URI() == "" {
 				return fmt.Errorf("backend: %s, config for must have uri", r.Path)
-			}
-			// step: read in a any files reference by @path
-			for k, v := range x.Values() {
-				if strings.HasPrefix(v, "@") {
-					path := strings.TrimPrefix(v, "@")
-					if !utils.IsFile(path) {
-						return fmt.Errorf("backend: %s, file referenced in config: %v does not exist", r.Path, v)
-					}
-					// step: read in the file and update the key with the content
-					content, err := ioutil.ReadFile(path)
-					if err != nil {
-						return err
-					}
-					(*x)[k] = string(content)
-				}
 			}
 		}
 	}

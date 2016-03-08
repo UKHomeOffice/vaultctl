@@ -23,7 +23,7 @@ const (
 	// Email is the email of the author
 	Email = "gambol99@gmail.com"
 	// Version is the version
-	Version = "v0.0.3"
+	Version = "v0.0.4"
 )
 
 type resources struct {

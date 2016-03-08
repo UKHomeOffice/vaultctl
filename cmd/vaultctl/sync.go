@@ -213,7 +213,7 @@ func (r *syncCommand) applyPolicies(policies []string) error {
 	var list []string
 
 	for _, p := range policies {
-		name := filepath.Base(p)
+		name := strings.TrimRight(filepath.Base(p), filepath.Ext(filepath.Base(p)))
 		list = append(list, name)
 
 		// step: read in the content
@@ -221,6 +221,7 @@ func (r *syncCommand) applyPolicies(policies []string) error {
 		if err != nil {
 			return err
 		}
+
 		if err := r.client.SetPolicy(name, string(content)); err != nil {
 			return err
 		}
@@ -269,7 +270,7 @@ func (r *syncCommand) applyUsers(users []*api.User) error {
 			path = "default"
 		}
 
-		log.Infof("[user: %s/%s] ensuring user, policies: %s", path, x.UserPass.Username, x.GetPolicies())
+		log.Infof("[user: %s/%s] ensuring user, policies: %s", path, x.Username(), x.GetPolicies())
 
 		// step: attempt to add the user
 		if err := r.client.AddUser(x); err != nil {

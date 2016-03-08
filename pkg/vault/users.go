@@ -23,11 +23,20 @@ import (
 	"github.com/UKHomeOffice/vaultctl/pkg/api"
 
 	log "github.com/Sirupsen/logrus"
+	"io/ioutil"
 )
 
 type userConfig struct {
 	Password string `json:"password"`
 	Policies string `json:"policies"`
+}
+
+type tokenConfig struct {
+	ID string `json:"id,omitempty"`
+	DisplayName string `json:"display_name"`
+	Policies []string `json:"policies"`
+	TTL string `json:"ttl,omitempty"`
+	MaxUses int `json:"num_uses"`
 }
 
 // AddUser adds a user to vault
@@ -52,17 +61,40 @@ func (r *Client) AddUser(user *api.User) error {
 			Policies: strings.Join(user.Policies, ","),
 		}
 	}
+	if user.UserToken != nil {
+		if err := user.UserToken.IsValid(); err != nil {
+			return err
+		}
+		// step: use the path or default to the type
+		path := "token"
+		if user.Path != "" {
+			path = user.Path
+		}
+		uri = fmt.Sprintf("auth/%s/create", path)
+
+		params = &tokenConfig{
+			ID: user.UserToken.ID,
+			DisplayName: user.UserToken.DisplayName,
+			TTL: user.UserToken.TTL.String(),
+			MaxUses: user.UserToken.MaxUses,
+			Policies: user.Policies,
+		}
+	}
 
 	log.Debugf("adding the user: %s", params)
 
-	resp, err := r.Request("PUT", uri, params)
+	resp, err := r.Request("POST", uri, params)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("unable to add user: %s", resp.Body)
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		content, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("unable to add user: code: %d, body: %s", resp.StatusCode, content)
 	}
 
 	return nil
