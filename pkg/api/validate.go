@@ -117,6 +117,15 @@ func (r Secret) IsValid() error {
 	return nil
 }
 
+// IsValid validates the policy is ok
+func (r Policy) IsValid() error {
+	if r.Name == "" {
+		return fmt.Errorf("the policy must have a name")
+	}
+
+	return nil
+}
+
 // IsValid validates the backend is ok
 func (r Backend) IsValid() error {
 	if r.Path == "" {

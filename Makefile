@@ -69,7 +69,7 @@ format:
 
 cover:
 	@echo "--> Running go cover"
-	@go test --cover ${PACKAGES}
+	@godep go test --cover ${PACKAGES}
 
 test: deps
 	@echo "--> Running the tests"

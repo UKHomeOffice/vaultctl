@@ -10,6 +10,46 @@ auths:
   - uri: config
     organization: UKHomeOffice
 
+policies:
+- name: platform
+  policy: |
+    path "platform/secrets/*" {
+      policy = "read"
+    }
+
+    path "platform/aws/*" {
+      policy = "read"
+    }
+- name: common
+  policy: | 
+    # allow thme to login via userpass
+    path "auth/userpass/login/*" {
+      policy = "write"
+    }
+
+    # allow them to revoke a lease
+    path "sys/revoke" {
+      policy = "write"
+    }
+
+    # allow them to renew a lease
+    path "sys/renew" {
+      policy = "write"
+    }
+- name: platform_tls
+  policy: |
+    # Gives you access to the platform production wildcard certs
+    path "platform/platform_tls/*" {
+      policy = "read"
+    }
+#- name: another_policy
+#  policy: |
+#    # Gives you access to the platform production wildcard certs
+#    path "platform/platform_tls/*" {
+#      policy = "read"
+#    }
+
+
 users:
 - userpass:
     username: rohithj

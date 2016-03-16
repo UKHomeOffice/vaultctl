@@ -30,6 +30,8 @@ type Config struct {
 	Secrets []*Secret `yaml:"secrets" json:"secrets" hcl:"secrets"`
 	// Auths is a series of authentication backend's
 	Auths []*Auth `yaml:"auths" json:"auths" hcl:"auths"`
+	// Policies is a series of policies
+	Policies []*Policy `yaml:"policies" json:"policies" hcl:"policies"`
 }
 
 // Auth defined a authentication backend
@@ -58,6 +60,14 @@ type Backend struct {
 	MaxLeaseTTL time.Duration `yaml:"max-lease-ttl" json:"max-lease-ttl" hcl:"max-lease-ttl"`
 	// Attrs is the configuration of the mount point
 	Attrs []*Attributes `yaml:"attributes" json:"attributes" hcl:"attributes"`
+}
+
+// Policy defines a vault policy
+type Policy struct {
+	// Name is the name of the policy
+	Name string `yaml:"name" json:"name" hcl:"name"`
+	// Policy is the policy itsefl
+	Policy string `yaml:"policy" json:"policy" hcl:"policy"`
 }
 
 // Secret defines a secret

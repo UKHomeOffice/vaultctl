@@ -17,9 +17,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,16 +32,8 @@ import (
 )
 
 type syncCommand struct {
-	// a collection of auths
-	auths []*api.Auth
-	// a collection of users
-	users []*api.User
-	// a collection of backends
-	backends []*api.Backend
-	// a collection of secrets
-	secrets []*api.Secret
-	// a collection of polices files
-	policyFiles []string
+	// a collection of resources
+	resources *resources
 	// a list of configuration files
 	configFiles []string
 	// whether to perform a full sync
@@ -62,8 +52,6 @@ type syncCommand struct {
 	skipSecrets bool
 	// delete will delete any resources no longer referenced
 	delete bool
-	// policyExtension
-	policyExtension string
 	// configExtension
 	configExtension string
 }
@@ -87,7 +75,8 @@ func (r *syncCommand) action(cx *cli.Context) error {
 	r.client = client
 
 	// step: parse the configuration files
-	if err := r.parseConfigFiles(); err != nil {
+	r.resources, err = parseConfigFiles(r.configFiles)
+	if err != nil {
 		return err
 	}
 	// step: synchronize the elements
@@ -103,27 +92,27 @@ func (r *syncCommand) action(cx *cli.Context) error {
 // synchronize process the items and sync them
 func (r *syncCommand) synchronize() error {
 	if !r.skipAuths {
-		if err := r.applyAuths(r.auths); err != nil {
+		if err := r.applyAuths(r.resources.auths); err != nil {
 			return err
 		}
 	}
 	if !r.skipPolicies {
-		if err := r.applyPolicies(r.policyFiles); err != nil {
+		if err := r.applyPolicies(r.resources.policies); err != nil {
 			return err
 		}
 	}
 	if !r.skipUsers {
-		if err := r.applyUsers(r.users); err != nil {
+		if err := r.applyUsers(r.resources.users); err != nil {
 			return err
 		}
 	}
 	if !r.skipBackends {
-		if err := r.applyBackends(r.backends); err != nil {
+		if err := r.applyBackends(r.resources.backends); err != nil {
 			return err
 		}
 	}
 	if !r.skipSecrets {
-		if err := r.applySecrets(r.secrets); err != nil {
+		if err := r.applySecrets(r.resources.secrets); err != nil {
 			return err
 		}
 	}
@@ -170,7 +159,7 @@ func (r *syncCommand) applyAuths(auths []*api.Auth) error {
 			}
 			log.Infof("[auth->config: %s] applying configuration to auth", uri)
 
-			resp, err := r.client.Request("PUT", uri, &c)
+			resp, err := r.client.Request("POST", uri, &c)
 			if err != nil {
 				return err
 			}
@@ -207,26 +196,17 @@ func (r *syncCommand) applyAuths(auths []*api.Auth) error {
 }
 
 // applyPolicies applies the policies to a vault instance
-func (r *syncCommand) applyPolicies(policies []string) error {
-	log.Infof("%s", color.GreenString("-> synchronizing the vault policies, %d files", len(policies)))
+func (r *syncCommand) applyPolicies(policies []*api.Policy) error {
+	log.Infof("%s", color.GreenString("-> synchronizing the vault policies, %d policies", len(policies)))
 
 	var list []string
 
 	for _, p := range policies {
-		name := strings.TrimRight(filepath.Base(p), filepath.Ext(filepath.Base(p)))
-		list = append(list, name)
-
-		// step: read in the content
-		content, err := ioutil.ReadFile(p)
-		if err != nil {
+		if err := r.client.SetPolicy(p.Name, p.Policy); err != nil {
 			return err
 		}
-
-		if err := r.client.SetPolicy(name, string(content)); err != nil {
-			return err
-		}
-
-		log.Infof("[policy: %s] successfully applied the policy, filename: %s", name, p)
+		list = append(list, p.Name)
+		log.Infof("[policy: %s] successfully applied the policy", p.Name)
 	}
 
 	if r.fullsync {
@@ -392,25 +372,6 @@ func (r *syncCommand) applySecrets(secrets []*api.Secret) error {
 	return nil
 }
 
-// parseConfigFiles reads a series of configuration files or directories and extracts the items from them
-func (r *syncCommand) parseConfigFiles() error {
-	// step: iterate the configuration files and decode
-	for _, c := range r.configFiles {
-		cfg := new(api.Config)
-
-		if err := utils.DecodeFile(c, cfg); err != nil {
-			return fmt.Errorf("unable to decode the file: %s, error: %s", c, err)
-		}
-
-		// step: appends the elements
-		r.users = append(r.users, cfg.Users...)
-		r.backends = append(r.backends, cfg.Backends...)
-		r.secrets = append(r.secrets, cfg.Secrets...)
-		r.auths = append(r.auths, cfg.Auths...)
-	}
-
-	return nil
-}
 
 // validateAction validates the inputs from the command line
 func (r *syncCommand) validateAction(cx *cli.Context) error {
@@ -437,12 +398,6 @@ func (r *syncCommand) validateAction(cx *cli.Context) error {
 	}
 	r.configFiles = append(r.configFiles, files...)
 
-	// step: get a list of policy files from the directories
-	r.policyFiles, err = utils.FindFilesInDirectory(cx.StringSlice("policies"), r.policyExtension)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -464,12 +419,8 @@ func (r *syncCommand) getCommand() cli.Command {
 				Name:  "C, config-dir",
 				Usage: "the path to a directory containing one of more config files",
 			},
-			cli.StringSliceFlag{
-				Name:  "p, policies",
-				Usage: "the path to a directory containing one of more policy files",
-			},
 			cli.BoolFlag{
-				Name:	     "sync-full",
+				Name:        "sync-full",
 				Usage:       "a full sync will also check the resources are still reference and attempt to delete",
 				Destination: &r.fullsync,
 			},
@@ -499,15 +450,9 @@ func (r *syncCommand) getCommand() cli.Command {
 				Destination: &r.skipSecrets,
 			},
 			cli.StringFlag{
-				Name:        "policy-extension",
-				Usage:       "the file extenions of the policy files",
-				Value:       "*.hcl",
-				Destination: &r.policyExtension,
-			},
-			cli.StringFlag{
 				Name:        "config-extension",
 				Usage:       "when using a config-dir, the file extension to glob",
-				Value:       "*.yml",
+				Value:       "*.yaml",
 				Destination: &r.configExtension,
 			},
 		},

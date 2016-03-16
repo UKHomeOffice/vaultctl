@@ -35,4 +35,6 @@ type resources struct {
 	backends []*api.Backend
 	// a collection of secrets
 	secrets []*api.Secret
+	// a collection of policies
+	policies []*api.Policy
 }
