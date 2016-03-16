@@ -28,26 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
-// parseConfigFiles parses the configuration files and extracts the resources
-func parseConfigFiles(files []string) (*resources, error) {
-	r := new(resources)
-
-	// step: iterate the configuration files and decode
-	for _, c := range files {
-		cfg := new(api.Config)
-		if err := utils.DecodeFile(c, cfg); err != nil {
-			return nil, fmt.Errorf("unable to decode the file: %s, error: %s", c, err)
-		}
-		// step: appends the elements
-		r.users = append(r.users, cfg.Users...)
-		r.backends = append(r.backends, cfg.Backends...)
-		r.secrets = append(r.secrets, cfg.Secrets...)
-		r.auths = append(r.auths, cfg.Auths...)
-	}
-
-	return r, nil
-}
-
 // getKubeClient retrieves a kube client
 func getKubeClient(cx *cli.Context) (*unversioned.Client, error) {
 	filename := cx.String("kubeconfig")
@@ -92,6 +72,29 @@ func getKubeClient(cx *cli.Context) (*unversioned.Client, error) {
 	}
 
 	return client, nil
+}
+
+// parseConfigFiles reads a series of configuration files or directories and extracts the items from them
+func parseConfigFiles(files []string) (*resources, error) {
+	r := new(resources)
+
+	// step: iterate the configuration files and decode
+	for _, c := range files {
+		cfg := new(api.Config)
+
+		if err := utils.DecodeFile(c, cfg); err != nil {
+			return nil, fmt.Errorf("unable to decode the file: %s, error: %s", c, err)
+		}
+
+		// step: appends the elements
+		r.users = append(r.users, cfg.Users...)
+		r.backends = append(r.backends, cfg.Backends...)
+		r.secrets = append(r.secrets, cfg.Secrets...)
+		r.auths = append(r.auths, cfg.Auths...)
+		r.policies = append(r.policies, cfg.Policies...)
+	}
+
+	return r, nil
 }
 
 // getVaultClient retrieves a vault client for use

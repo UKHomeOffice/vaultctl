@@ -193,7 +193,6 @@ func (r *kubeCmd) validate(cx *cli.Context) error {
 		}
 	}
 
-
 	return nil
 }
 
@@ -228,7 +227,7 @@ func (r *kubeCmd) getCommand() cli.Command {
 				EnvVar:      "KUBERNETES_HOST",
 			},
 			cli.StringFlag{
-				Name:	     "T, kube-token",
+				Name:        "T, kube-token",
 				Usage:       "a bearer token to use for kubernetes authentication",
 				Destination: &r.kubeToken,
 			},

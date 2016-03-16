@@ -32,11 +32,11 @@ type userConfig struct {
 }
 
 type tokenConfig struct {
-	ID string `json:"id,omitempty"`
-	DisplayName string `json:"display_name"`
-	Policies []string `json:"policies"`
-	TTL string `json:"ttl,omitempty"`
-	MaxUses int `json:"num_uses"`
+	ID          string   `json:"id,omitempty"`
+	DisplayName string   `json:"display_name"`
+	Policies    []string `json:"policies"`
+	TTL         string   `json:"ttl,omitempty"`
+	MaxUses     int      `json:"num_uses"`
 }
 
 // AddUser adds a user to vault
@@ -73,11 +73,11 @@ func (r *Client) AddUser(user *api.User) error {
 		uri = fmt.Sprintf("auth/%s/create", path)
 
 		params = &tokenConfig{
-			ID: user.UserToken.ID,
+			ID:          user.UserToken.ID,
 			DisplayName: user.UserToken.DisplayName,
-			TTL: user.UserToken.TTL.String(),
-			MaxUses: user.UserToken.MaxUses,
-			Policies: user.Policies,
+			TTL:         user.UserToken.TTL.String(),
+			MaxUses:     user.UserToken.MaxUses,
+			Policies:    user.Policies,
 		}
 	}
 

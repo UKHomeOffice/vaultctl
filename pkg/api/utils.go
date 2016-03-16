@@ -50,8 +50,11 @@ func (r Backend) GetMaxTTL() string {
 
 // URI returns the uri for the config item
 func (r *Attributes) URI() string {
-	x, _ := (*r)["uri"]
-	return x.(string)
+	if x, found := (*r)["uri"]; found {
+		return x.(string)
+	}
+
+	return ""
 }
 
 // IsOneshot checks if the attribute is a oneshot attribute
